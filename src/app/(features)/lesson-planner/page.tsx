@@ -29,6 +29,8 @@ import { Download } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 
 const lessonPlannerSchema = z.object({
@@ -93,7 +95,7 @@ export default function LessonPlannerPage() {
 
 
   async function onSubmit(values: LessonPlannerFormValues) {
-    if (!user) {
+    if (!user || !db) {
       toast({
         variant: "destructive",
         title: "Authentication Error",
@@ -105,9 +107,25 @@ export default function LessonPlannerPage() {
     setIsLoading(true);
     setLessonPlan('');
     try {
-      const result = await generateLessonPlan({ ...values, uid: user.uid });
+      const result = await generateLessonPlan(values);
       setLessonPlan(result.weeklyPlan);
-      await fetchHistory(user.uid); // Re-fetch history to show the new one
+
+      try {
+        const historyRef = collection(db, 'teachers', user.uid, 'lessonHistory');
+        await addDoc(historyRef, {
+            ...values,
+            createdAt: serverTimestamp()
+        });
+        await fetchHistory(user.uid);
+      } catch (historyError) {
+        console.error("Failed to save lesson plan history:", historyError);
+        toast({
+            variant: 'default',
+            title: 'Note',
+            description: "Your lesson plan was generated, but we couldn't save it to your history.",
+        });
+      }
+
     } catch (error) {
       console.error('Error generating lesson plan:', error);
       toast({

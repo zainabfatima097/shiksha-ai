@@ -5,15 +5,14 @@
  *
  * - generateLessonPlan - A function that handles the lesson plan generation process.
  * - getLessonPlanHistory - A function to retrieve the user's last 5 lesson plans.
- * - GenerateLessonPlanInput - The input type for the generateLessonPlan function.
+ * - LessonPlanHistoryItem - The type for a single item in the lesson plan history, and the input for generation.
  * - GenerateLessonPlanOutput - The return type for the generateLessonPlan function.
- * - LessonPlanHistoryItem - The type for a single item in the lesson plan history.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
 
 const LessonPlanDataSchema = z.object({
@@ -28,19 +27,13 @@ const LessonPlanDataSchema = z.object({
 export type LessonPlanHistoryItem = z.infer<typeof LessonPlanDataSchema>;
 
 
-const GenerateLessonPlanInputSchema = LessonPlanDataSchema.extend({
-    uid: z.string().describe("The user's unique ID.")
-});
-export type GenerateLessonPlanInput = z.infer<typeof GenerateLessonPlanInputSchema>;
-
-
 const GenerateLessonPlanOutputSchema = z.object({
   weeklyPlan: z.string().describe('A detailed weekly lesson plan in Markdown format.'),
 });
 export type GenerateLessonPlanOutput = z.infer<typeof GenerateLessonPlanOutputSchema>;
 
 
-export async function generateLessonPlan(input: GenerateLessonPlanInput): Promise<GenerateLessonPlanOutput> {
+export async function generateLessonPlan(input: LessonPlanHistoryItem): Promise<GenerateLessonPlanOutput> {
   return generateLessonPlanFlow(input);
 }
 
@@ -79,25 +72,11 @@ Your final response must be a JSON object with a single key "weeklyPlan" that co
 
 const generateLessonPlanFlow = ai.defineFlow({
   name: 'generateLessonPlanFlow',
-  inputSchema: GenerateLessonPlanInputSchema,
+  inputSchema: LessonPlanDataSchema,
   outputSchema: GenerateLessonPlanOutputSchema,
 },
-async input => {
-    const { uid, ...planData } = input;
-    const { output } = await prompt(planData);
-
-    if (uid) {
-        try {
-            const historyRef = collection(db, 'teachers', uid, 'lessonHistory');
-            await addDoc(historyRef, {
-                ...planData,
-                createdAt: serverTimestamp()
-            });
-        } catch (error) {
-            console.error("Failed to save lesson plan history:", error);
-            // Non-blocking error
-        }
-    }
+async (input) => {
+    const { output } = await prompt(input);
 
     if (!output) {
       throw new Error("Failed to generate lesson plan from AI. The model did not return the expected output format.");
@@ -107,6 +86,10 @@ async input => {
 
 
 export async function getLessonPlanHistory(uid: string): Promise<LessonPlanHistoryItem[]> {
+    if (!db) {
+        console.error("Firestore is not initialized, cannot fetch history.");
+        return [];
+    }
     try {
         const historyRef = collection(db, 'teachers', uid, 'lessonHistory');
         const q = query(historyRef, orderBy('createdAt', 'desc'), limit(5));
