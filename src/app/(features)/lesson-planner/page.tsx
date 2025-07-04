@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { generateLessonPlan, getLessonPlanHistory, LessonPlanHistoryItem } from '@/ai/flows/ai-lesson-planner';
+import { generateLessonPlan, LessonPlanHistoryItem } from '@/ai/flows/ai-lesson-planner';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
@@ -30,7 +30,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
 
 
 const lessonPlannerSchema = z.object({
@@ -73,16 +73,43 @@ export default function LessonPlannerPage() {
   }, [authLoading, profile, router]);
 
   const fetchHistory = useCallback(async (uid: string) => {
+    if (!db) {
+        console.error("Firestore is not initialized. Cannot fetch history.");
+        return;
+    }
     setIsHistoryLoading(true);
     try {
-        const historyData = await getLessonPlanHistory(uid);
+        const historyRef = collection(db, 'teachers', uid, 'lessonHistory');
+        const q = query(historyRef, orderBy('createdAt', 'desc'), limit(5));
+        const querySnapshot = await getDocs(q);
+
+        const historyData: LessonPlanHistoryItem[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.subject && data.topic && data.gradeLevel && data.learningObjectives && data.localLanguage) {
+                historyData.push({
+                    subject: data.subject,
+                    topic: data.topic,
+                    gradeLevel: data.gradeLevel,
+                    learningObjectives: data.learningObjectives,
+                    localLanguage: data.localLanguage,
+                    additionalDetails: data.additionalDetails || '',
+                });
+            }
+        });
         setHistory(historyData);
     } catch (error: any) {
         console.error("Failed to fetch history from database", error);
+        let description = 'Could not load your recent plans. An unknown error occurred.';
+         if (error.code === 'failed-precondition') {
+            description = `A Firestore index is required. Please create it in your Firebase console. The error was: "${error.message}"`;
+        } else if (error.code === 'permission-denied') {
+            description = 'Permission denied. Please check your Firestore security rules to ensure you can read from the "lessonHistory" collection.';
+        }
         toast({ 
             variant: 'destructive', 
             title: 'Error Loading History', 
-            description: error.message || 'Could not load your recent plans.',
+            description: description,
             duration: 9000,
         });
     } finally {
@@ -121,13 +148,14 @@ export default function LessonPlannerPage() {
             ...values,
             createdAt: serverTimestamp()
         });
+        // Refetch history after successful save
         await fetchHistory(user.uid);
       } catch (historyError: any) {
         console.error("Failed to save lesson plan history:", historyError);
         toast({
             variant: 'destructive',
             title: 'Could Not Save History',
-            description: historyError.message || "An unknown error occurred. Please check your Firestore security rules in the Firebase console.",
+            description: `An error occurred while saving: ${historyError.message}. Please check your Firestore security rules.`,
             duration: 9000,
         });
       }
