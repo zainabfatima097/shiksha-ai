@@ -9,7 +9,7 @@ import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
-const navItems = [
+const teacherNavItems = [
   { href: "/lesson-planner", icon: BookText, label: "Lesson Planner" },
   { href: "/differentiated-worksheets", icon: Sheet, label: "Worksheets" },
   { href: "/visual-aids", icon: ImageIcon, label: "Visual Aids" },
@@ -17,11 +17,15 @@ const navItems = [
   { href: "/local-content", icon: Languages, label: "Local Content" },
 ];
 
+const studentNavItems = [
+    { href: "/knowledge-base", icon: BrainCircuit, label: "Knowledge Base" },
+];
+
 export function NavItems() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -40,6 +44,8 @@ export function NavItems() {
       });
     }
   };
+
+  const navItems = profile?.role === 'teacher' ? teacherNavItems : studentNavItems;
 
   return (
     <div className="flex flex-col h-full justify-between">

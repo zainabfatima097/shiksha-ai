@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -15,6 +15,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Image from 'next/image';
 import { Download } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
 
 const visualAidSchema = z.object({
   description: z.string().min(10, 'Please provide a more detailed description.'),
@@ -24,6 +26,15 @@ export default function VisualAidsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [visualAid, setVisualAid] = useState<string | null>(null);
   const { toast } = useToast();
+  const { profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+
+  useEffect(() => {
+    if (!authLoading && profile && profile.role !== 'teacher') {
+        router.replace('/profile');
+    }
+  }, [authLoading, profile, router]);
 
   const form = useForm<z.infer<typeof visualAidSchema>>({
     resolver: zodResolver(visualAidSchema),
@@ -74,6 +85,14 @@ export default function VisualAidsPage() {
         description: "Visual aid has been downloaded."
     });
   };
+
+  if (authLoading || !profile || profile.role !== 'teacher') {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <LoadingSpinner className="h-12 w-12" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

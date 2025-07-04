@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { generateLocalContent } from '@/ai/flows/generate-local-content';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
 
 const localContentSchema = z.object({
   prompt: z.string().min(10, 'Prompt must be at least 10 characters.'),
@@ -23,6 +25,15 @@ export default function LocalContentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [content, setContent] = useState('');
   const { toast } = useToast();
+  const { profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+
+  useEffect(() => {
+    if (!authLoading && profile && profile.role !== 'teacher') {
+        router.replace('/profile');
+    }
+  }, [authLoading, profile, router]);
 
   const form = useForm<z.infer<typeof localContentSchema>>({
     resolver: zodResolver(localContentSchema),
@@ -48,6 +59,14 @@ export default function LocalContentPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (authLoading || !profile || profile.role !== 'teacher') {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <LoadingSpinner className="h-12 w-12" />
+        </div>
+    );
   }
 
   return (

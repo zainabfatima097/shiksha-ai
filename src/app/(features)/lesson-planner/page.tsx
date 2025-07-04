@@ -27,6 +27,7 @@ import {
 import { Download } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 
 const lessonPlannerSchema = z.object({
@@ -46,20 +47,15 @@ export default function LessonPlannerPage() {
   const [lessonPlan, setLessonPlan] = useState('');
   const [history, setHistory] = useState<LessonPlanHistoryItem[]>([]);
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const lessonPlanRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
-  const form = useForm<LessonPlannerFormValues>({
-    resolver: zodResolver(lessonPlannerSchema),
-    defaultValues: {
-      subject: '',
-      topic: '',
-      gradeLevel: '',
-      learningObjectives: '',
-      localLanguage: 'English',
-      additionalDetails: '',
-    },
-  });
+  useEffect(() => {
+    if (!authLoading && profile && profile.role !== 'teacher') {
+        router.replace('/profile');
+    }
+  }, [authLoading, profile, router]);
 
   const fetchHistory = useCallback(async (uid: string) => {
     setIsHistoryLoading(true);
@@ -75,12 +71,12 @@ export default function LessonPlannerPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (user) {
+    if (user && profile?.role === 'teacher') {
       fetchHistory(user.uid);
     } else if (!authLoading) {
       setIsHistoryLoading(false);
     }
-  }, [user, authLoading, fetchHistory]);
+  }, [user, profile, authLoading, fetchHistory]);
 
 
   async function onSubmit(values: LessonPlannerFormValues) {
@@ -167,6 +163,14 @@ export default function LessonPlannerPage() {
         setIsLoading(false);
       });
   };
+
+  if (authLoading || !profile || profile.role !== 'teacher') {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <LoadingSpinner className="h-12 w-12" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">

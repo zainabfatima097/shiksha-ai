@@ -3,10 +3,22 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth, isFirebaseConfigured } from '@/lib/firebase';
+import { auth, isFirebaseConfigured, db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
+interface UserProfile {
+    uid: string;
+    name: string;
+    email: string;
+    role: 'teacher' | 'student';
+    class?: string;
+    section?: string;
+    rollNumber?: string;
+}
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
 }
 
@@ -44,12 +56,39 @@ function MissingConfigMessage() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (auth) {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (auth && db) {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
         setUser(user);
+        if (user) {
+          // Fetch profile
+          let userProfile: UserProfile | null = null;
+          try {
+            // Try fetching from 'teachers' collection first
+            let docRef = doc(db, 'teachers', user.uid);
+            let docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                userProfile = docSnap.data() as UserProfile;
+            } else {
+                // If not found, try 'students' collection
+                docRef = doc(db, 'students', user.uid);
+                docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    userProfile = docSnap.data() as UserProfile;
+                }
+            }
+          } catch(e) {
+            console.error("Failed to fetch user profile", e)
+          }
+          setProfile(userProfile);
+        } else {
+          setProfile(null);
+        }
         setLoading(false);
       });
       return () => unsubscribe();
@@ -62,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <MissingConfigMessage />;
   }
 
-  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, profile, loading }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {

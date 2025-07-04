@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,6 +14,8 @@ import { generateDifferentiatedWorksheets, GenerateDifferentiatedWorksheetsOutpu
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Image from 'next/image';
+import { useAuth } from '@/hooks/use-auth';
+import { useRouter } from 'next/navigation';
 
 
 const worksheetsSchema = z.object({
@@ -26,6 +28,16 @@ export default function DifferentiatedWorksheetsPage() {
   const [worksheets, setWorksheets] = useState<GenerateDifferentiatedWorksheetsOutput['worksheets']>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const { toast } = useToast();
+  const { profile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+
+  useEffect(() => {
+    if (!authLoading && profile && profile.role !== 'teacher') {
+        router.replace('/profile');
+    }
+  }, [authLoading, profile, router]);
+
 
   const form = useForm<z.infer<typeof worksheetsSchema>>({
     resolver: zodResolver(worksheetsSchema),
@@ -67,6 +79,14 @@ export default function DifferentiatedWorksheetsPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (authLoading || !profile || profile.role !== 'teacher') {
+    return (
+        <div className="flex items-center justify-center h-full">
+            <LoadingSpinner className="h-12 w-12" />
+        </div>
+    );
   }
 
   return (
