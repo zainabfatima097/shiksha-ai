@@ -77,9 +77,13 @@ export default function LessonPlannerPage() {
     try {
         const historyData = await getLessonPlanHistory(uid);
         setHistory(historyData);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to fetch history from database", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your recent plans.' });
+        toast({ 
+            variant: 'destructive', 
+            title: 'Error Loading History', 
+            description: error.message || 'Could not load your recent plans.',
+        });
     } finally {
         setIsHistoryLoading(false);
     }

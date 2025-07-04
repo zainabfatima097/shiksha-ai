@@ -108,9 +108,13 @@ export async function getLessonPlanHistory(uid: string): Promise<LessonPlanHisto
             });
         });
         return history;
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to fetch lesson plan history:", error);
-        // On error, return an empty array to avoid breaking the UI.
+        // This specific error code indicates a missing Firestore index.
+        if (error.code === 'failed-precondition') {
+            throw new Error('A Firestore index is required for this query. Please create an index on the "lessonHistory" collection for the "createdAt" field (descending) in your Firebase console.');
+        }
+        // For other errors, return an empty array to avoid breaking the UI.
         return [];
     }
 }
