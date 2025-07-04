@@ -54,6 +54,12 @@ export default function LessonPlannerPage() {
   const lessonPlanRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
+  useEffect(() => {
+    if (!authLoading && profile && profile.role !== 'teacher') {
+        router.replace('/profile');
+    }
+  }, [authLoading, profile, router]);
+
   const form = useForm<LessonPlannerFormValues>({
     resolver: zodResolver(lessonPlannerSchema),
     defaultValues: {
@@ -65,12 +71,6 @@ export default function LessonPlannerPage() {
       additionalDetails: '',
     },
   });
-
-  useEffect(() => {
-    if (!authLoading && profile && profile.role !== 'teacher') {
-        router.replace('/profile');
-    }
-  }, [authLoading, profile, router]);
 
   const fetchHistory = useCallback(async (uid: string) => {
     if (!db) {
