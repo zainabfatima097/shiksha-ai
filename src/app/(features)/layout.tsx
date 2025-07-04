@@ -4,12 +4,9 @@ import {
   SidebarHeader,
   SidebarContent,
   SidebarInset,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { NavItems } from "@/components/nav-items";
-import { Button } from "@/components/ui/button";
-import { Menu } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,7 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarContent>
         </Sidebar>
         <SidebarInset>
-            <main>{children}</main>
+            {children}
         </SidebarInset>
       </div>
     </SidebarProvider>
