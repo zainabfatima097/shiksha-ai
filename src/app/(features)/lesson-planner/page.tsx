@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { generateLessonPlan, GenerateLessonPlanInput } from '@/ai/flows/ai-lesson-planner';
+import { generateLessonPlan, getLessonPlanHistory, LessonPlanHistoryItem } from '@/ai/flows/ai-lesson-planner';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
@@ -25,6 +25,9 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Download } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 const lessonPlannerSchema = z.object({
   subject: z.string().min(1, 'Subject is required'),
@@ -39,9 +42,11 @@ type LessonPlannerFormValues = z.infer<typeof lessonPlannerSchema>;
 
 export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [lessonPlan, setLessonPlan] = useState('');
-  const [history, setHistory] = useState<LessonPlannerFormValues[]>([]);
+  const [history, setHistory] = useState<LessonPlanHistoryItem[]>([]);
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const lessonPlanRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<LessonPlannerFormValues>({
@@ -56,36 +61,44 @@ export default function LessonPlannerPage() {
     },
   });
 
-  useEffect(() => {
+  const fetchHistory = useCallback(async (uid: string) => {
+    setIsHistoryLoading(true);
     try {
-      const savedHistory = localStorage.getItem('lessonPlanHistory');
-      if (savedHistory) {
-        setHistory(JSON.parse(savedHistory));
-      }
+        const historyData = await getLessonPlanHistory(uid);
+        setHistory(historyData);
     } catch (error) {
-      console.error("Failed to load history from localStorage", error);
+        console.error("Failed to fetch history from database", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your recent plans.' });
+    } finally {
+        setIsHistoryLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
-    try {
-        localStorage.setItem('lessonPlanHistory', JSON.stringify(history));
-    } catch (error) {
-        console.error("Failed to save history to localStorage", error);
+    if (user) {
+      fetchHistory(user.uid);
+    } else if (!authLoading) {
+      setIsHistoryLoading(false);
     }
-  }, [history]);
+  }, [user, authLoading, fetchHistory]);
+
 
   async function onSubmit(values: LessonPlannerFormValues) {
-    setHistory(prevHistory => {
-        const newHistory = [values, ...prevHistory.filter(item => JSON.stringify(item) !== JSON.stringify(values))];
-        return newHistory.slice(0, 5);
-    });
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "You must be signed in to generate a lesson plan."
+      });
+      return;
+    }
 
     setIsLoading(true);
     setLessonPlan('');
     try {
-      const result = await generateLessonPlan(values as GenerateLessonPlanInput);
+      const result = await generateLessonPlan({ ...values, uid: user.uid });
       setLessonPlan(result.weeklyPlan);
+      await fetchHistory(user.uid); // Re-fetch history to show the new one
     } catch (error) {
       console.error('Error generating lesson plan:', error);
       toast({
@@ -162,30 +175,38 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        {history.length > 0 && (
-          <div className="max-w-4xl mx-auto mb-8">
-            <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
-            <Carousel opts={{ align: "start", loop: false }} className="w-full">
-              <CarouselContent className="-ml-2">
-                {history.map((item, index) => (
-                  <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
-                    <div className="p-1">
-                      <Card
-                        className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
-                        onClick={() => handleHistoryClick(item)}
-                      >
-                        <CardHeader>
-                          <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
-                          <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
-                        </CardHeader>
-                      </Card>
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="hidden sm:flex" />
-              <CarouselNext className="hidden sm:flex" />
-            </Carousel>
+        {(isHistoryLoading || history.length > 0) && (
+            <div className="max-w-4xl mx-auto mb-8">
+              <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
+              {isHistoryLoading ? (
+                 <div className="flex space-x-4">
+                    <Skeleton className="h-28 flex-1 rounded-lg" />
+                    <Skeleton className="h-28 flex-1 rounded-lg md:block hidden" />
+                    <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
+                 </div>
+              ) : (
+                <Carousel opts={{ align: "start", loop: false }} className="w-full">
+                  <CarouselContent className="-ml-2">
+                    {history.map((item, index) => (
+                      <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
+                        <div className="p-1">
+                          <Card
+                            className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
+                            onClick={() => handleHistoryClick(item)}
+                          >
+                            <CardHeader>
+                              <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
+                              <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
+                            </CardHeader>
+                          </Card>
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="hidden sm:flex" />
+                  <CarouselNext className="hidden sm:flex" />
+                </Carousel>
+              )}
           </div>
         )}
         <Card className="max-w-4xl mx-auto">
