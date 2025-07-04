@@ -83,6 +83,7 @@ export default function LessonPlannerPage() {
             variant: 'destructive', 
             title: 'Error Loading History', 
             description: error.message || 'Could not load your recent plans.',
+            duration: 9000,
         });
     } finally {
         setIsHistoryLoading(false);
@@ -121,12 +122,13 @@ export default function LessonPlannerPage() {
             createdAt: serverTimestamp()
         });
         await fetchHistory(user.uid);
-      } catch (historyError) {
+      } catch (historyError: any) {
         console.error("Failed to save lesson plan history:", historyError);
         toast({
-            variant: 'default',
-            title: 'Note',
-            description: "Your lesson plan was generated, but we couldn't save it to your history.",
+            variant: 'destructive',
+            title: 'Could Not Save History',
+            description: historyError.message || "An unknown error occurred. Please check your Firestore security rules in the Firebase console.",
+            duration: 9000,
         });
       }
 
