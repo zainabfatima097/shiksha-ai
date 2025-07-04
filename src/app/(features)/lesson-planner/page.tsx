@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -15,6 +15,13 @@ import { generateLessonPlan, GenerateLessonPlanInput } from '@/ai/flows/ai-lesso
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 const lessonPlannerSchema = z.object({
   subject: z.string().min(1, 'Subject is required'),
@@ -25,12 +32,15 @@ const lessonPlannerSchema = z.object({
   additionalDetails: z.string().optional(),
 });
 
+type LessonPlannerFormValues = z.infer<typeof lessonPlannerSchema>;
+
 export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [lessonPlan, setLessonPlan] = useState('');
+  const [history, setHistory] = useState<LessonPlannerFormValues[]>([]);
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof lessonPlannerSchema>>({
+  const form = useForm<LessonPlannerFormValues>({
     resolver: zodResolver(lessonPlannerSchema),
     defaultValues: {
       subject: '',
@@ -42,7 +52,31 @@ export default function LessonPlannerPage() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof lessonPlannerSchema>) {
+  useEffect(() => {
+    try {
+      const savedHistory = localStorage.getItem('lessonPlanHistory');
+      if (savedHistory) {
+        setHistory(JSON.parse(savedHistory));
+      }
+    } catch (error) {
+      console.error("Failed to load history from localStorage", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+        localStorage.setItem('lessonPlanHistory', JSON.stringify(history));
+    } catch (error) {
+        console.error("Failed to save history to localStorage", error);
+    }
+  }, [history]);
+
+  async function onSubmit(values: LessonPlannerFormValues) {
+    setHistory(prevHistory => {
+        const newHistory = [values, ...prevHistory.filter(item => JSON.stringify(item) !== JSON.stringify(values))];
+        return newHistory.slice(0, 5);
+    });
+
     setIsLoading(true);
     setLessonPlan('');
     try {
@@ -60,6 +94,11 @@ export default function LessonPlannerPage() {
     }
   }
 
+  const handleHistoryClick = (item: LessonPlannerFormValues) => {
+    form.reset(item);
+    setLessonPlan('');
+  };
+
   return (
     <div className="flex flex-col h-full">
        <header className="flex items-center justify-between p-4 border-b md:hidden">
@@ -67,6 +106,32 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
+        {history.length > 0 && (
+          <div className="max-w-4xl mx-auto mb-8">
+            <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
+            <Carousel opts={{ align: "start", loop: false }} className="w-full">
+              <CarouselContent className="-ml-2">
+                {history.map((item, index) => (
+                  <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
+                    <div className="p-1">
+                      <Card
+                        className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
+                        onClick={() => handleHistoryClick(item)}
+                      >
+                        <CardHeader>
+                          <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
+                          <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
+                        </CardHeader>
+                      </Card>
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden sm:flex" />
+              <CarouselNext className="hidden sm:flex" />
+            </Carousel>
+          </div>
+        )}
         <Card className="max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
