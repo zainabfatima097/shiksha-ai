@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut } from "lucide-react";
+import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 const navItems = [
   { href: "/lesson-planner", icon: BookText, label: "Lesson Planner" },
@@ -20,6 +21,7 @@ export function NavItems() {
   const pathname = usePathname();
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -58,6 +60,14 @@ export function NavItems() {
         ))}
       </SidebarMenu>
       <SidebarMenu>
+         <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Profile" isActive={pathname === '/profile'}>
+              <Link href="/profile">
+                <User />
+                <span className="truncate">{user?.email ?? "Profile"}</span>
+              </Link>
+            </SidebarMenuButton>
+        </SidebarMenuItem>
         <SidebarMenuItem>
             <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
               <LogOut />

@@ -8,7 +8,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -76,7 +77,27 @@ export default function SignupPage() {
   async function onSubmit(values: SignupFormValues) {
     setIsLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const user = userCredential.user;
+
+      // Prepare user data for Firestore
+      const userData: any = {
+          uid: user.uid,
+          email: values.email,
+          name: values.name,
+          role: values.role,
+      };
+
+      if (values.role === 'student') {
+          userData.class = values.class;
+          userData.section = values.section;
+          userData.rollNumber = values.rollNumber;
+      }
+
+      // Save user data to Firestore
+      const collectionName = values.role === 'teacher' ? 'teachers' : 'students';
+      await setDoc(doc(db, collectionName, user.uid), userData);
+
       toast({
         title: 'Account Created',
         description: 'You have successfully signed up!',
