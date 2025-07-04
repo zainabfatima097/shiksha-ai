@@ -23,44 +23,14 @@ const GenerateVisualAidOutputSchema = z.object({
   visualAidDataUri: z
     .string()
     .describe(
-      'The generated visual aid as a data URI that must include a MIME type and use Base64 encoding. Expected format: \'data:<mimetype>;base64,<encoded_data>\'.'    ),
+      "The generated visual aid as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
 });
 export type GenerateVisualAidOutput = z.infer<typeof GenerateVisualAidOutputSchema>;
 
 export async function generateVisualAid(input: GenerateVisualAidInput): Promise<GenerateVisualAidOutput> {
   return generateVisualAidFlow(input);
 }
-
-const prompt = ai.definePrompt({
-  name: 'generateVisualAidPrompt',
-  input: {schema: GenerateVisualAidInputSchema},
-  output: {schema: GenerateVisualAidOutputSchema},
-  prompt: `You are an AI assistant that generates simple line drawings or charts based on a teacher's description.
-
-  The visual aid should be easily replicable on a blackboard to explain concepts.
-
-  Description: {{{description}}}`, 
-  config: {
-    safetySettings: [
-      {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_ONLY_HIGH',
-      },
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-      },
-      {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-      {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_LOW_AND_ABOVE',
-      },
-    ],
-  },
-});
 
 const generateVisualAidFlow = ai.defineFlow(
   {
@@ -69,11 +39,31 @@ const generateVisualAidFlow = ai.defineFlow(
     outputSchema: GenerateVisualAidOutputSchema,
   },
   async input => {
+    const fullPrompt = `Generate a very simple, black and white line drawing or chart based on the following description. The visual aid should be easily replicable on a blackboard with chalk to explain concepts. It should be clear, minimalist, and without color or shading. Description: ${input.description}`;
+
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
-      prompt: input.description,
+      prompt: fullPrompt,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
+        safetySettings: [
+          {
+            category: 'HARM_CATEGORY_HATE_SPEECH',
+            threshold: 'BLOCK_ONLY_HIGH',
+          },
+          {
+            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            threshold: 'BLOCK_NONE',
+          },
+          {
+            category: 'HARM_CATEGORY_HARASSMENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+          },
+          {
+            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            threshold: 'BLOCK_LOW_AND_ABOVE',
+          },
+        ],
       },
     });
     return {visualAidDataUri: media!.url!};
