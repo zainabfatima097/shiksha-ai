@@ -49,16 +49,18 @@ const prompt = ai.definePrompt({
   name: 'generateLessonPlanPrompt',
   input: {schema: LessonPlanDataSchema},
   output: {schema: GenerateLessonPlanOutputSchema},
-  prompt: `You are an experienced teacher creating a weekly lesson plan for the following subject, topic and grade level.
+  prompt: `You are an experienced teacher creating a weekly lesson plan.
+
+Please generate a detailed and well-structured weekly lesson plan based on the following details.
+The lesson plan should be written in {{{localLanguage}}}.
+
 Subject: {{{subject}}}
 Topic: {{{topic}}}
 Grade Level: {{{gradeLevel}}}
 Learning Objectives: {{{learningObjectives}}}
-Local Language: {{{localLanguage}}}
 Additional Details: {{{additionalDetails}}}
 
-Create a detailed and well-structured weekly lesson plan that includes specific activities, resources, and assessment methods. Please return it in the local language.
-The output should be formatted as a single Markdown string. The lesson plan should be easy to follow and implement in a low-resource environment.
+The lesson plan must be a single, well-formatted Markdown string. It should be easy to follow and implement in a low-resource environment.
 Use Markdown for headings, lists, bold text, etc. to structure the plan. For example:
 
 # Weekly Lesson Plan: [Topic]
@@ -69,6 +71,8 @@ Use Markdown for headings, lists, bold text, etc. to structure the plan. For exa
 *   **Resources:** ...
 
 ## Day 2: ...
+
+Your final response must be a JSON object with a single key "weeklyPlan" that contains the entire lesson plan as a Markdown string.
 `,
 });
 
@@ -95,7 +99,10 @@ async input => {
         }
     }
 
-    return output!;
+    if (!output) {
+      throw new Error("Failed to generate lesson plan from AI. The model did not return the expected output format.");
+    }
+    return output;
 });
 
 
