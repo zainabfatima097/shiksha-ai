@@ -192,40 +192,45 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        {(isHistoryLoading || history.length > 0) && (
-            <div className="max-w-4xl mx-auto mb-8">
-              <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
-              {isHistoryLoading ? (
-                 <div className="flex space-x-4">
-                    <Skeleton className="h-28 flex-1 rounded-lg" />
-                    <Skeleton className="h-28 flex-1 rounded-lg md:block hidden" />
-                    <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
-                 </div>
-              ) : (
-                <Carousel opts={{ align: "start", loop: false }} className="w-full">
-                  <CarouselContent className="-ml-2">
-                    {history.map((item, index) => (
-                      <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
-                        <div className="p-1">
-                          <Card
-                            className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
-                            onClick={() => handleHistoryClick(item)}
-                          >
-                            <CardHeader>
-                              <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
-                              <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
-                            </CardHeader>
-                          </Card>
-                        </div>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="hidden sm:flex" />
-                  <CarouselNext className="hidden sm:flex" />
-                </Carousel>
-              )}
-          </div>
-        )}
+        <div className="max-w-4xl mx-auto mb-8">
+            <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
+            {isHistoryLoading ? (
+                <div className="flex space-x-4">
+                <Skeleton className="h-28 flex-1 rounded-lg" />
+                <Skeleton className="h-28 flex-1 rounded-lg md:block hidden" />
+                <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
+                </div>
+            ) : history.length > 0 ? (
+            <Carousel opts={{ align: "start", loop: false }} className="w-full">
+                <CarouselContent className="-ml-2">
+                {history.map((item, index) => (
+                    <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
+                    <div className="p-1">
+                        <Card
+                        className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
+                        onClick={() => handleHistoryClick(item)}
+                        >
+                        <CardHeader>
+                            <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
+                            <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
+                        </CardHeader>
+                        </Card>
+                    </div>
+                    </CarouselItem>
+                ))}
+                </CarouselContent>
+                <CarouselPrevious className="hidden sm:flex" />
+                <CarouselNext className="hidden sm:flex" />
+            </Carousel>
+            ) : (
+                <Card className="bg-secondary/50 border-dashed">
+                    <CardContent className="p-6">
+                        <p className="text-center text-muted-foreground">You have no recent lesson plans. Generate one below to get started!</p>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+
         <Card className="max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
