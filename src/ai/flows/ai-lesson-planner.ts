@@ -23,7 +23,7 @@ const GenerateLessonPlanInputSchema = z.object({
 export type GenerateLessonPlanInput = z.infer<typeof GenerateLessonPlanInputSchema>;
 
 const GenerateLessonPlanOutputSchema = z.object({
-  weeklyPlan: z.string().describe('A detailed weekly lesson plan.'),
+  weeklyPlan: z.string().describe('A detailed weekly lesson plan in Markdown format.'),
 });
 
 export type GenerateLessonPlanOutput = z.infer<typeof GenerateLessonPlanOutputSchema>;
@@ -44,7 +44,18 @@ Learning Objectives: {{{learningObjectives}}}
 Local Language: {{{localLanguage}}}
 Additional Details: {{{additionalDetails}}}
 
-Create a detailed and well-structured weekly lesson plan that includes specific activities, resources, and assessment methods. Please return it in the local language. The lesson plan should be easy to follow and implement in a low-resource environment.
+Create a detailed and well-structured weekly lesson plan that includes specific activities, resources, and assessment methods. Please return it in the local language.
+The output should be formatted as a single Markdown string. The lesson plan should be easy to follow and implement in a low-resource environment.
+Use Markdown for headings, lists, bold text, etc. to structure the plan. For example:
+
+# Weekly Lesson Plan: [Topic]
+
+## Day 1: Introduction
+*   **Objective:** ...
+*   **Activity:** ...
+*   **Resources:** ...
+
+## Day 2: ...
 `,
 });
 

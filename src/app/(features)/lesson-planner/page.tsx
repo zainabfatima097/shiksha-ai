@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateLessonPlan, GenerateLessonPlanInput } from '@/ai/flows/ai-lesson-planner';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import ReactMarkdown from 'react-markdown';
 
 const lessonPlannerSchema = z.object({
   subject: z.string().min(1, 'Subject is required'),
@@ -179,7 +180,9 @@ export default function LessonPlannerPage() {
                   <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <pre className="whitespace-pre-wrap font-body text-sm">{lessonPlan}</pre>
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <ReactMarkdown>{lessonPlan}</ReactMarkdown>
+                  </div>
                 </CardContent>
               </Card>
              </CardFooter>
