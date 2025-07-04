@@ -20,6 +20,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -101,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <MissingConfigMessage />;
   }
 
-  return <AuthContext.Provider value={{ user, profile, loading }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, profile, loading, setProfile }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
