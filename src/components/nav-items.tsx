@@ -19,6 +19,7 @@ const teacherNavItems = [
 
 const studentNavItems = [
     { href: "/knowledge-base", icon: BrainCircuit, label: "Knowledge Base" },
+    { href: "/local-content", icon: Languages, label: "Local Content" },
 ];
 
 export function NavItems() {
@@ -29,7 +30,9 @@ export function NavItems() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      if (auth) {
+        await signOut(auth);
+      }
       router.push('/login');
       toast({
           title: "Logged Out",
