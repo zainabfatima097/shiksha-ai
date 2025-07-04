@@ -14,6 +14,7 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import Image from 'next/image';
+import { Download } from 'lucide-react';
 
 const visualAidSchema = z.object({
   description: z.string().min(10, 'Please provide a more detailed description.'),
@@ -48,6 +49,31 @@ export default function VisualAidsPage() {
       setIsLoading(false);
     }
   }
+
+  const handleExport = () => {
+    if (!visualAid) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No visual aid to export.',
+      });
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = visualAid;
+
+    const mimeType = visualAid.match(/data:image\/([a-zA-Z+]+);/);
+    const extension = mimeType ? mimeType[1] : 'png';
+    link.download = `visual-aid.${extension}`;
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({
+        title: "Success",
+        description: "Visual aid has been downloaded."
+    });
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -91,9 +117,24 @@ export default function VisualAidsPage() {
         )}
         {visualAid && (
           <CardFooter>
-            <div className='w-full p-4 border rounded-lg bg-secondary/50'>
-              <Image src={visualAid} alt="Generated visual aid" width={512} height={512} className="rounded-md mx-auto" />
-            </div>
+            <Card className="w-full bg-secondary/50">
+              <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="font-headline text-xl">Generated Visual Aid</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleExport}
+                      aria-label="Export Visual Aid"
+                    >
+                      <Download className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+              <CardContent className="flex justify-center p-6">
+                <Image src={visualAid} alt="Generated visual aid" width={512} height={512} className="rounded-md" />
+              </CardContent>
+            </Card>
           </CardFooter>
         )}
       </Card>
