@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -50,6 +51,18 @@ export default function LessonPlannerPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const lessonPlanRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  const form = useForm<LessonPlannerFormValues>({
+    resolver: zodResolver(lessonPlannerSchema),
+    defaultValues: {
+      subject: '',
+      topic: '',
+      gradeLevel: '',
+      learningObjectives: '',
+      localLanguage: 'English',
+      additionalDetails: '',
+    },
+  });
 
   useEffect(() => {
     if (!authLoading && profile && profile.role !== 'teacher') {
