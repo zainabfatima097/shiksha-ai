@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -22,6 +24,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
+import { Download } from 'lucide-react';
 
 const lessonPlannerSchema = z.object({
   subject: z.string().min(1, 'Subject is required'),
@@ -39,6 +42,7 @@ export default function LessonPlannerPage() {
   const [lessonPlan, setLessonPlan] = useState('');
   const [history, setHistory] = useState<LessonPlannerFormValues[]>([]);
   const { toast } = useToast();
+  const lessonPlanRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<LessonPlannerFormValues>({
     resolver: zodResolver(lessonPlannerSchema),
@@ -97,6 +101,58 @@ export default function LessonPlannerPage() {
   const handleHistoryClick = (item: LessonPlannerFormValues) => {
     form.reset(item);
     setLessonPlan('');
+  };
+
+  const handleExportToPdf = () => {
+    const input = lessonPlanRef.current;
+    if (!input) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not find the lesson plan content to export.',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    html2canvas(input, { scale: 2, useCORS: true })
+      .then((canvas) => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+        });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgWidth = imgProps.width;
+        const imgHeight = imgProps.height;
+        
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+        const imgX = (pdfWidth - imgWidth * ratio) / 2;
+        
+        pdf.addImage(
+          imgData,
+          'PNG',
+          imgX,
+          0,
+          imgWidth * ratio,
+          imgHeight * ratio
+        );
+        pdf.save('lesson-plan.pdf');
+      })
+      .catch((error) => {
+        console.error('Error generating PDF:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to export lesson plan as PDF. Please try again.',
+        });
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   return (
@@ -240,9 +296,20 @@ export default function LessonPlannerPage() {
           </CardContent>
           {lessonPlan && (
              <CardFooter>
-              <Card className="w-full bg-secondary/50">
+              <Card className="w-full bg-secondary/50" ref={lessonPlanRef}>
                 <CardHeader>
-                  <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleExportToPdf}
+                      disabled={isLoading}
+                      aria-label="Export to PDF"
+                    >
+                      <Download className="h-5 w-5" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="prose prose-sm max-w-none dark:prose-invert">
