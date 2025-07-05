@@ -244,7 +244,7 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        <div className="max-w-4xl mx-auto mb-8">
+        <div className="mb-8">
             <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
             {isHistoryLoading ? (
                 <div className="flex space-x-4">
@@ -283,7 +283,7 @@ export default function LessonPlannerPage() {
             )}
         </div>
 
-        <Card className="max-w-4xl mx-auto">
+        <Card>
           <CardHeader>
             <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
             <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
