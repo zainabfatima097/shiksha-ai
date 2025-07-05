@@ -1,2 +1,4 @@
-// This file is deprecated and has been emptied to resolve a routing conflict.
-// The active admin page is now located at /src/app/admin/page.tsx.
+// This file is intentionally structured to not export a React component
+// in order to resolve a routing conflict with /src/app/admin/page.tsx.
+const deprecated = true;
+export default deprecated;
