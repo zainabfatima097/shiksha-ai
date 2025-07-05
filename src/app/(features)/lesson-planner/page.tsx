@@ -31,7 +31,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { cn } from '@/lib/utils';
 
 
 const lessonPlannerSchema = z.object({
@@ -245,7 +244,7 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto">
             <div className="mb-8">
                 <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
                 {isHistoryLoading ? (
@@ -285,141 +284,139 @@ export default function LessonPlannerPage() {
                 )}
             </div>
 
-            <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-8 items-start")}>
-              <Card>
+            <Card>
                 <CardHeader>
-                  <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
-                  <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
+                <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
+                <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Form {...form}>
+                <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormField
-                          control={form.control}
-                          name="subject"
-                          render={({ field }) => (
+                        control={form.control}
+                        name="subject"
+                        render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Subject</FormLabel>
-                              <FormControl>
+                            <FormLabel>Subject</FormLabel>
+                            <FormControl>
                                 <Input placeholder="e.g., Science" {...field} />
-                              </FormControl>
-                              <FormMessage />
+                            </FormControl>
+                            <FormMessage />
                             </FormItem>
-                          )}
+                        )}
                         />
                         <FormField
-                          control={form.control}
-                          name="topic"
-                          render={({ field }) => (
+                        control={form.control}
+                        name="topic"
+                        render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Topic</FormLabel>
-                              <FormControl>
+                            <FormLabel>Topic</FormLabel>
+                            <FormControl>
                                 <Input placeholder="e.g., The Water Cycle" {...field} />
-                              </FormControl>
-                              <FormMessage />
+                            </FormControl>
+                            <FormMessage />
                             </FormItem>
-                          )}
+                        )}
                         />
                         <FormField
-                          control={form.control}
-                          name="gradeLevel"
-                          render={({ field }) => (
+                        control={form.control}
+                        name="gradeLevel"
+                        render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Grade Level</FormLabel>
-                              <FormControl>
+                            <FormLabel>Grade Level</FormLabel>
+                            <FormControl>
                                 <Input placeholder="e.g., 4th Grade" {...field} />
-                              </FormControl>
-                              <FormMessage />
+                            </FormControl>
+                            <FormMessage />
                             </FormItem>
-                          )}
+                        )}
                         />
                         <FormField
-                          control={form.control}
-                          name="localLanguage"
-                          render={({ field }) => (
+                        control={form.control}
+                        name="localLanguage"
+                        render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Language</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormLabel>Language</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
-                                  <SelectTrigger>
+                                <SelectTrigger>
                                     <SelectValue placeholder="Select a language" />
-                                  </SelectTrigger>
+                                </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="English">English</SelectItem>
-                                  <SelectItem value="Hindi">Hindi</SelectItem>
-                                  <SelectItem value="Marathi">Marathi</SelectItem>
-                                  <SelectItem value="Bengali">Bengali</SelectItem>
-                                  <SelectItem value="Tamil">Tamil</SelectItem>
+                                <SelectItem value="English">English</SelectItem>
+                                <SelectItem value="Hindi">Hindi</SelectItem>
+                                <SelectItem value="Marathi">Marathi</SelectItem>
+                                <SelectItem value="Bengali">Bengali</SelectItem>
+                                <SelectItem value="Tamil">Tamil</SelectItem>
                                 </SelectContent>
-                              </Select>
-                              <FormMessage />
+                            </Select>
+                            <FormMessage />
                             </FormItem>
-                          )}
+                        )}
                         />
-                      </div>
-                      <FormField
+                    </div>
+                    <FormField
                         control={form.control}
                         name="learningObjectives"
                         render={({ field }) => (
-                          <FormItem>
+                        <FormItem>
                             <FormLabel>Learning Objectives</FormLabel>
                             <FormControl>
-                              <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
+                            <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
                             </FormControl>
                             <FormMessage />
-                          </FormItem>
+                        </FormItem>
                         )}
-                      />
-                      <FormField
+                    />
+                    <FormField
                         control={form.control}
                         name="additionalDetails"
                         render={({ field }) => (
-                          <FormItem>
+                        <FormItem>
                             <FormLabel>Additional Details (Optional)</FormLabel>
                             <FormControl>
-                              <Textarea placeholder="e.g., Focus on local examples of water sources." {...field} />
+                            <Textarea placeholder="e.g., Focus on local examples of water sources." {...field} />
                             </FormControl>
                             <FormMessage />
-                          </FormItem>
+                        </FormItem>
                         )}
-                      />
-                      <Button type="submit" disabled={isLoading}>
+                    />
+                    <Button type="submit" disabled={isLoading}>
                         {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
                         Generate Plan
-                      </Button>
+                    </Button>
                     </form>
-                  </Form>
+                </Form>
                 </CardContent>
-              </Card>
+            </Card>
 
-              {lessonPlan && (
-                <div className="lg:sticky lg:top-8">
-                  <Card className="w-full bg-secondary/50" ref={lessonPlanRef}>
+            {lessonPlan && (
+                <div className="mt-8">
+                <Card className="w-full bg-secondary/50" ref={lessonPlanRef}>
                     <CardHeader>
-                      <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center">
                         <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleExportToPdf}
-                          disabled={isLoading}
-                          aria-label="Export to PDF"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleExportToPdf}
+                        disabled={isLoading}
+                        aria-label="Export to PDF"
                         >
-                          <Download className="h-5 w-5" />
+                        <Download className="h-5 w-5" />
                         </Button>
-                      </div>
+                    </div>
                     </CardHeader>
-                    <CardContent className="lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
-                      <div className="prose prose-sm max-w-none dark:prose-invert">
-                        <ReactMarkdown>{lessonPlan}</ReactMarkdown>
-                      </div>
+                    <CardContent>
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                            <ReactMarkdown>{lessonPlan}</ReactMarkdown>
+                        </div>
                     </CardContent>
-                  </Card>
+                </Card>
                 </div>
-              )}
-            </div>
+            )}
         </div>
       </div>
     </div>
