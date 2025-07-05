@@ -186,41 +186,81 @@ export default function AdminPage() {
     let createdCount = 0;
     const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
-    for (let i = 1; i <= values.count; i++) {
-      const email = `teacher${i}@example.com`;
-      const password = `teacher${i}`;
+    try {
+      updateLog(`Querying for existing teachers...`);
+      const teachersQuery = query(collection(db, 'teachers'));
+      const querySnapshot = await getDocs(teachersQuery);
 
-      try {
-        updateLog(`Creating teacher ${i}/${values.count}: ${email}...`);
-        
-        const tempAppName = `teacher-creator-${Date.now()}-${i}`;
-        const tempApp = initializeApp(firebaseConfig, tempAppName);
-        const tempAuth = getAuth(tempApp);
+      let lastTeacherNumber = 0;
+      querySnapshot.forEach((doc) => {
+        const teacherData = doc.data();
+        if (teacherData.name && typeof teacherData.name === 'string') {
+          const nameParts = teacherData.name.split(' ');
+          if (nameParts.length > 0) {
+            const lastPart = nameParts[nameParts.length - 1];
+            const currentNumber = parseInt(lastPart, 10);
+            if (!isNaN(currentNumber) && currentNumber > lastTeacherNumber) {
+              lastTeacherNumber = currentNumber;
+            }
+          }
+        }
+      });
+      
+      updateLog(`Highest existing teacher number is ${lastTeacherNumber}. Starting new teachers from ${lastTeacherNumber + 1}.`);
+      
+      for (let i = 0; i < values.count; i++) {
+        const teacherNumber = lastTeacherNumber + i + 1;
+        const email = `teacher${teacherNumber}@example.com`;
+        const password = `teacher${teacherNumber}`;
+        const name = `Teacher ${teacherNumber}`;
 
-        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
-        const user = userCredential.user;
+        try {
+          updateLog(`[${i + 1}/${values.count}] Creating teacher: ${email}...`);
+          
+          const tempAppName = `teacher-creator-${Date.now()}-${teacherNumber}`;
+          const tempApp = initializeApp(firebaseConfig, tempAppName);
+          const tempAuth = getAuth(tempApp);
 
-        const teacherData = {
-          uid: user.uid,
-          email,
-          name: `Teacher ${i}`,
-          role: 'teacher',
-          dev_generated: true,
-        };
+          const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+          const user = userCredential.user;
 
-        await setDoc(doc(db, 'teachers', user.uid), teacherData);
-        await deleteApp(tempApp);
-        
-        updateLog(`Successfully created ${email}.`);
-        createdCount++;
-      } catch (error: any) {
-        handleGenerationError(error, i, email);
-        return;
-      } finally {
-        setProgress(((i) / values.count) * 100);
+          const teacherData = {
+            uid: user.uid,
+            email,
+            name: name,
+            role: 'teacher',
+            dev_generated: true,
+          };
+
+          await setDoc(doc(db, 'teachers', user.uid), teacherData);
+          await deleteApp(tempApp);
+          
+          updateLog(`- Successfully created ${email}.`);
+          createdCount++;
+        } catch (error: any) {
+          handleGenerationError(error, i + 1, email);
+          return;
+        } finally {
+          setProgress(((i + 1) / values.count) * 100);
+        }
       }
+      endGeneration(createdCount, values.count, 'teacher');
+    } catch (error: any) {
+        console.error("Failed to query for teachers:", error);
+        let description = 'Could not query existing teachers. An unknown error occurred.';
+         if (error.code === 'failed-precondition') {
+            description = `A Firestore index is required. Please create it in your Firebase console. The error was: "${error.message}"`;
+        } else if (error.code === 'permission-denied') {
+            description = 'Permission denied. Please check your Firestore security rules to ensure you can query the "teachers" collection.';
+        }
+        toast({
+            variant: 'destructive',
+            title: 'Generation Failed',
+            description,
+            duration: 9000,
+        });
+        setIsGenerating(false);
     }
-    endGeneration(createdCount, values.count, 'teacher');
   }
 
   async function handleMassDelete() {
@@ -506,5 +546,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
