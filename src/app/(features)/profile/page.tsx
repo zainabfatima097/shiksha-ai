@@ -59,9 +59,14 @@ export default function ProfilePage() {
 
             toast({ title: "Success", description: "Profile updated successfully." });
             setIsEditing(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error updating profile:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to update profile.' });
+            toast({ 
+                variant: 'destructive', 
+                title: 'Update Failed', 
+                description: error.message || 'An unknown error occurred. This is often due to Firestore security rules.',
+                duration: 9000,
+            });
         } finally {
             setIsUpdating(false);
         }
