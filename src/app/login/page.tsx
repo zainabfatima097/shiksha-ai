@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { useAuth } from '@/hooks/use-auth';
+import { Separator } from '@/components/ui/separator';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address.'),
@@ -114,6 +115,18 @@ export default function LoginPage() {
               Sign Up
             </Link>
           </div>
+          {process.env.NEXT_PUBLIC_DEV_MODE === 'true' && (
+            <>
+              <Separator className="my-4" />
+              <div className="text-center">
+                <Link href="/admin" passHref>
+                  <Button variant="outline" className="w-full">
+                    Admin Console
+                  </Button>
+                </Link>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User, ShieldAlert } from "lucide-react";
+import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +27,6 @@ export function NavItems() {
   const router = useRouter();
   const { toast } = useToast();
   const { user, profile } = useAuth();
-  const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
 
   const handleLogout = async () => {
     try {
@@ -54,20 +53,6 @@ export function NavItems() {
   return (
     <div className="flex flex-col h-full justify-between">
       <SidebarMenu>
-        {isDevMode && (
-            <SidebarMenuItem>
-                <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith('/admin')}
-                tooltip="Admin Panel"
-                >
-                <Link href="/admin">
-                    <ShieldAlert />
-                    <span>Admin Panel</span>
-                </Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-        )}
         {navItems.map((item) => (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton
