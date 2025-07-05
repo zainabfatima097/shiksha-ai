@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User } from "lucide-react";
+import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User, Users } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 const teacherNavItems = [
   { href: "/lesson-planner", icon: BookText, label: "Lesson Planner" },
+  { href: "/classrooms", icon: Users, label: "Classrooms" },
   { href: "/differentiated-worksheets", icon: Sheet, label: "Worksheets" },
   { href: "/visual-aids", icon: ImageIcon, label: "Visual Aids" },
   { href: "/knowledge-base", icon: BrainCircuit, label: "Knowledge Base" },
@@ -18,6 +19,7 @@ const teacherNavItems = [
 ];
 
 const studentNavItems = [
+    { href: "/classrooms", icon: Users, label: "Classroom" },
     { href: "/knowledge-base", icon: BrainCircuit, label: "Knowledge Base" },
     { href: "/local-content", icon: Languages, label: "Local Content" },
 ];

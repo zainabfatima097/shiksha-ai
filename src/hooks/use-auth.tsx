@@ -14,6 +14,7 @@ interface UserProfile {
     class?: string;
     section?: string;
     rollNumber?: string;
+    classroomId?: string;
 }
 
 interface AuthContextType {

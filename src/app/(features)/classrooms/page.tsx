@@ -1,0 +1,168 @@
+
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { db } from '@/lib/firebase';
+import { collection, doc, getDocs, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { LoadingSpinner } from '@/components/loading-spinner';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import { PlusCircle, CheckCircle, ArrowRight } from 'lucide-react';
+
+interface Classroom {
+  id: string;
+  grade: string;
+  section: string;
+  teacherIds?: string[];
+  studentIds?: string[];
+}
+
+export default function ClassroomsPage() {
+  const { user, profile, loading: authLoading } = useAuth();
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [joinedClassrooms, setJoinedClassrooms] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchClassrooms = useCallback(async () => {
+    if (!db) return;
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'classrooms'));
+      const classroomsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
+      setClassrooms(classroomsData);
+
+      if (profile?.role === 'teacher' && user) {
+        const teacherDoc = await getDoc(doc(db, 'teachers', user.uid));
+        if (teacherDoc.exists()) {
+          setJoinedClassrooms(teacherDoc.data().classroomIds || []);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching classrooms:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not load classrooms.' });
+    } finally {
+      setLoading(false);
+    }
+  }, [profile?.role, user, toast]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchClassrooms();
+    }
+  }, [authLoading, fetchClassrooms]);
+
+  const handleJoinLeave = async (classroomId: string, isJoined: boolean) => {
+    if (!user || !db || profile?.role !== 'teacher') return;
+
+    const classroomRef = doc(db, 'classrooms', classroomId);
+    const teacherRef = doc(db, 'teachers', user.uid);
+
+    try {
+      if (isJoined) {
+        await updateDoc(classroomRef, { teacherIds: arrayRemove(user.uid) });
+        await updateDoc(teacherRef, { classroomIds: arrayRemove(classroomId) });
+        setJoinedClassrooms(prev => prev.filter(id => id !== classroomId));
+        toast({ title: 'Success', description: 'You have left the classroom.' });
+      } else {
+        await updateDoc(classroomRef, { teacherIds: arrayUnion(user.uid) });
+        await updateDoc(teacherRef, { classroomIds: arrayUnion(classroomId) });
+        setJoinedClassrooms(prev => [...prev, classroomId]);
+        toast({ title: 'Success', description: 'You have joined the classroom.' });
+      }
+    } catch (error) {
+      console.error('Error joining/leaving classroom:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'An error occurred. Please try again.' });
+    }
+  };
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner className="h-12 w-12" />
+      </div>
+    );
+  }
+
+  if (profile?.role === 'student') {
+    const studentClassroom = classrooms.find(c => c.id === profile.classroomId);
+    return (
+      <div className="flex flex-col h-full">
+        <header className="flex items-center justify-between p-4 border-b md:hidden">
+          <h1 className="font-headline text-xl font-bold text-primary">Your Classroom</h1>
+          <SidebarTrigger />
+        </header>
+        <div className="flex-1 p-4 md:p-8 overflow-auto">
+          <Card className="max-w-4xl mx-auto">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl">Your Classroom</CardTitle>
+              <CardDescription>View messages and updates from your teachers.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {studentClassroom ? (
+                <Link href={`/classrooms/${studentClassroom.id}`} passHref>
+                  <Card className="hover:bg-accent cursor-pointer transition-colors">
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle>Grade {studentClassroom.grade} - Section {studentClassroom.section}</CardTitle>
+                          <CardDescription>Click to enter</CardDescription>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-muted-foreground"/>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ) : (
+                <p>You are not currently assigned to a classroom.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <header className="flex items-center justify-between p-4 border-b md:hidden">
+        <h1 className="font-headline text-xl font-bold text-primary">Manage Classrooms</h1>
+        <SidebarTrigger />
+      </header>
+      <div className="flex-1 p-4 md:p-8 overflow-auto">
+        <Card className="max-w-4xl mx-auto">
+          <CardHeader>
+            <CardTitle className="font-headline text-2xl">Manage Classrooms</CardTitle>
+            <CardDescription>Join classrooms to interact with students and post updates.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {classrooms.length > 0 ? classrooms.map(classroom => {
+              const isJoined = joinedClassrooms.includes(classroom.id);
+              return (
+                <div key={classroom.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <h3 className="font-bold">Grade {classroom.grade} - Section {classroom.section}</h3>
+                    {isJoined && <Link href={`/classrooms/${classroom.id}`} className="text-sm text-primary hover:underline">View Classroom</Link>}
+                  </div>
+                  <Button
+                    variant={isJoined ? 'outline' : 'default'}
+                    onClick={() => handleJoinLeave(classroom.id, isJoined)}
+                  >
+                    {isJoined ? <CheckCircle className="mr-2 h-4 w-4" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                    {isJoined ? 'Joined' : 'Join'}
+                  </Button>
+                </div>
+              );
+            }) : (
+              <p className="text-center text-muted-foreground">No classrooms have been created yet. Generate students in the admin panel to create classrooms.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

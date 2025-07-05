@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,15 +87,26 @@ export default function SignupPage() {
           name: values.name,
           role: values.role,
       };
-
+      
+      const collectionName = values.role === 'teacher' ? 'teachers' : 'students';
+      
       if (values.role === 'student') {
+          const classroomId = `${values.class}-${values.section}`;
           userData.class = values.class;
           userData.section = values.section;
           userData.rollNumber = values.rollNumber;
+          userData.classroomId = classroomId;
+
+          // Add student to classroom
+          const classroomRef = doc(db, 'classrooms', classroomId);
+          await setDoc(classroomRef, {
+              grade: values.class,
+              section: values.section,
+              studentIds: arrayUnion(user.uid)
+          }, { merge: true });
       }
 
       // Save user data to Firestore
-      const collectionName = values.role === 'teacher' ? 'teachers' : 'students';
       await setDoc(doc(db, collectionName, user.uid), userData);
 
       toast({

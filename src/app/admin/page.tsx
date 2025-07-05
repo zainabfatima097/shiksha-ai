@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, writeBatch, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db, firebaseConfig } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -139,6 +139,7 @@ export default function AdminPage() {
                 const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
                 const user = userCredential.user;
 
+                const classroomId = `${values.grade}-${values.section}`;
                 const studentData = {
                     uid: user.uid,
                     email,
@@ -148,12 +149,23 @@ export default function AdminPage() {
                     section: values.section,
                     rollNumber: String(rollNumber),
                     dev_generated: true,
+                    classroomId: classroomId,
                 };
+                
+                const studentDocRef = doc(db, 'students', user.uid);
+                await setDoc(studentDocRef, studentData);
+                
+                // Add student to classroom
+                const classroomRef = doc(db, 'classrooms', classroomId);
+                await setDoc(classroomRef, {
+                    grade: values.grade,
+                    section: values.section,
+                    studentIds: arrayUnion(user.uid)
+                }, { merge: true });
 
-                await setDoc(doc(db, 'students', user.uid), studentData);
                 await deleteApp(tempApp);
                 
-                updateLog(`- Successfully created ${email} with roll number ${rollNumber}.`);
+                updateLog(`- Successfully created ${email} and added to classroom ${classroomId}.`);
                 createdCount++;
             } catch (error: any) {
                 handleGenerationError(error, i + 1, email);
