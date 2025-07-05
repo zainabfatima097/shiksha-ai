@@ -74,12 +74,12 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         if (classroomData.teacherIds && classroomData.teacherIds.length > 0) {
             const teacherPromises = classroomData.teacherIds.map((id: string) => getDoc(doc(db, 'teachers', id)));
             const teacherDocs = await Promise.all(teacherPromises);
-            setTeachers(teacherDocs.filter(d => d.exists()).map(d => d.data() as Member));
+            setTeachers(teacherDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
         }
         if (classroomData.studentIds && classroomData.studentIds.length > 0) {
             const studentPromises = classroomData.studentIds.map((id: string) => getDoc(doc(db, 'students', id)));
             const studentDocs = await Promise.all(studentPromises);
-            setStudents(studentDocs.filter(d => d.exists()).map(d => d.data() as Member));
+            setStudents(studentDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
         }
       }
 
@@ -154,7 +154,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto flex gap-8">
+        <div className="h-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
           <div className="flex-1 min-w-0">
             <Card className="flex flex-col h-full">
                 <CardHeader>
@@ -163,7 +163,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
                         <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
                         <CardDescription>Updates and messages from your teachers.</CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="hidden lg:inline-flex shrink-0">
+                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="shrink-0">
                             <Users className="mr-2 h-4 w-4"/>
                             {showMembers ? 'Hide Members' : 'View Members'}
                         </Button>
@@ -205,7 +205,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
             </Card>
           </div>
           {showMembers && (
-            <div className="hidden lg:block w-80 shrink-0">
+            <div className="w-full lg:w-80 lg:shrink-0">
                 <Card className="h-full">
                     <CardHeader>
                         <CardTitle>Members</CardTitle>
