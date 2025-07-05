@@ -147,8 +147,8 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-          <div className="lg:col-span-2 flex flex-col h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-full">
+          <div className="lg:col-span-3 flex flex-col h-full">
             <Card className="flex-1 flex flex-col">
               <CardHeader>
                 <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
@@ -189,7 +189,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
               )}
             </Card>
           </div>
-          <div className="h-full flex flex-col">
+          <div className="lg:col-span-1 h-full flex flex-col">
              <Card className="flex-1">
                 <CardHeader>
                     <CardTitle className="font-headline">Members</CardTitle>
