@@ -1,0 +1,71 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isTeacher() {
+      return isSignedIn() && get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher';
+    }
+
+    function isStudent() {
+      return isSignedIn() && get(/databases/$(database)/documents/students/$(request.auth.uid)).data.role == 'student';
+    }
+
+    function getTeacherProfile(uid) {
+      return get(/databases/$(database)/documents/teachers/$(uid)).data;
+    }
+    
+    function getStudentProfile(uid) {
+      return get(/databases/$(database)/documents/students/$(uid)).data;
+    }
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow anyone to sign up
+    match /teachers/{userId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /students/{userId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /classrooms/{classroomId} {
+      allow read: if isSignedIn();
+      // Allow a teacher to join or leave a classroom (update the teacherIds array)
+      allow update: if isTeacher();
+    }
+    
+    match /classrooms/{classroomId}/posts/{postId} {
+      allow list, get: if isSignedIn();
+      // Allow teachers who are part of the classroom to create posts
+      allow create: if isTeacher() && classroomId in getTeacherProfile(request.auth.uid).classroomIds;
+      // Allow the teacher who created the post to delete it
+      allow delete: if isTeacher() && request.auth.uid == resource.data.authorId;
+    }
+
+    match /teachers/{teacherId}/lessonHistory/{historyId} {
+      // Only the teacher can access their own lesson history
+      allow read, list, create: if request.auth.uid == teacherId;
+    }
+
+    match /lessonPlans/{lessonPlanId} {
+      allow get: if isSignedIn();
+      // Only teachers can create new lesson plans
+      allow create: if isTeacher();
+    }
+  }
+}
