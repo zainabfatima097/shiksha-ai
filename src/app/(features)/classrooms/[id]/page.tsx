@@ -167,12 +167,17 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         title: 'Success',
         description: 'The post has been deleted.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting post:", error);
+      let description = 'Could not delete the post. Please try again.';
+      if (error.code === 'permission-denied') {
+        description = "You don't have permission to delete this post. Please check your Firestore security rules to allow teachers to delete their own posts.";
+      }
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Could not delete the post. Please try again.',
+        title: 'Deletion Error',
+        description,
+        duration: 9000,
       });
     }
   };
