@@ -125,8 +125,8 @@ export default function AdminPage() {
 
         for (let i = 0; i < values.count; i++) {
             const rollNumber = lastRollNumber + i + 1;
-            const email = `student${rollNumber}@example.com`;
-            const password = `student${rollNumber}`;
+            const email = `student${values.grade}${values.section}_${rollNumber}@example.com`;
+            const password = `student${values.grade}${values.section}_${rollNumber}`;
             const name = `Student ${rollNumber}`;
             
             try {
@@ -314,17 +314,26 @@ export default function AdminPage() {
             const userDoc = allUsers[i];
             const userData = userDoc.data();
             const email = userData.email;
-            const name = userData.name;
-            const role = userData.role;
-
+            
             updateLog(`\n[${i + 1}/${allUsers.length}] Processing ${email}...`);
 
             try {
-                const number = name.split(' ').pop();
-                if (!number || !/^\d+$/.test(number)) {
-                    throw new Error(`Could not parse user number from name: "${name}"`);
+                let password = '';
+                if (userData.role === 'student') {
+                    const { class: grade, section, rollNumber } = userData;
+                    if (!grade || !section || !rollNumber) {
+                        throw new Error(`Student data for ${email} is incomplete for password generation.`);
+                    }
+                    password = `student${grade}${section}_${rollNumber}`;
+                } else if (userData.role === 'teacher') {
+                    const number = userData.name.split(' ').pop();
+                    if (!number || !/^\d+$/.test(number)) {
+                        throw new Error(`Could not parse teacher number from name: "${userData.name}"`);
+                    }
+                    password = `teacher${number}`;
+                } else {
+                     throw new Error(`Unknown role for ${email}: ${userData.role}`);
                 }
-                const password = `${role}${number}`;
                 
                 const tempAppName = `deleter-${Date.now()}-${i}`;
                 const tempApp = initializeApp(firebaseConfig, tempAppName);
