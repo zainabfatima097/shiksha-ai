@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db, firebaseConfig } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -48,7 +48,7 @@ export default function AdminPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [generationLog, setGenerationLog] = useState<string[]>([]);
+  const [log, setLog] = useState<string[]>([]);
   const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
 
   useEffect(() => {
@@ -73,10 +73,11 @@ export default function AdminPage() {
     },
   });
 
-  const startGeneration = () => {
-    setIsGenerating(true);
+  const startOperation = (type: 'generation' | 'deletion') => {
+    if (type === 'generation') setIsGenerating(true);
+    if (type === 'deletion') setIsDeleting(true);
     setProgress(0);
-    setGenerationLog([]);
+    setLog([]);
   }
 
   const endGeneration = (createdCount: number, totalCount: number, userType: string) => {
@@ -89,7 +90,7 @@ export default function AdminPage() {
 
   const handleGenerationError = (error: any, index: number, email: string) => {
     console.error(`Failed to create user ${index}:`, error);
-    setGenerationLog(prev => [...prev, `Error creating ${email}: ${error.message}`]);
+    setLog(prev => [...prev, `Error creating ${email}: ${error.message}`]);
     toast({
       variant: 'destructive',
       title: `Generation Failed at User ${index}`,
@@ -100,16 +101,16 @@ export default function AdminPage() {
   }
 
   async function onStudentSubmit(values: z.infer<typeof studentGenerationSchema>) {
-    startGeneration();
+    startOperation('generation');
     let createdCount = 0;
+    const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
     for (let i = 1; i <= values.count; i++) {
       const email = `student${i + Date.now()}@example.com`;
       const password = `student${i}`;
-      const log = (message: string) => setGenerationLog(prev => [...prev, message]);
 
       try {
-        log(`Creating student ${i}/${values.count}: ${email}...`);
+        updateLog(`Creating student ${i}/${values.count}: ${email}...`);
         
         const tempAppName = `student-creator-${Date.now()}-${i}`;
         const tempApp = initializeApp(firebaseConfig, tempAppName);
@@ -132,7 +133,7 @@ export default function AdminPage() {
         await setDoc(doc(db, 'students', user.uid), studentData);
         await deleteApp(tempApp);
         
-        log(`Successfully created ${email} with roll number ${i}.`);
+        updateLog(`Successfully created ${email} with roll number ${i}.`);
         createdCount++;
       } catch (error: any) {
         handleGenerationError(error, i, email);
@@ -145,16 +146,16 @@ export default function AdminPage() {
   }
 
   async function onTeacherSubmit(values: z.infer<typeof teacherGenerationSchema>) {
-    startGeneration();
+    startOperation('generation');
     let createdCount = 0;
+    const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
     for (let i = 1; i <= values.count; i++) {
       const email = `teacher${i + Date.now()}@example.com`;
       const password = `teacher${i}`;
-      const log = (message: string) => setGenerationLog(prev => [...prev, message]);
 
       try {
-        log(`Creating teacher ${i}/${values.count}: ${email}...`);
+        updateLog(`Creating teacher ${i}/${values.count}: ${email}...`);
         
         const tempAppName = `teacher-creator-${Date.now()}-${i}`;
         const tempApp = initializeApp(firebaseConfig, tempAppName);
@@ -174,7 +175,7 @@ export default function AdminPage() {
         await setDoc(doc(db, 'teachers', user.uid), teacherData);
         await deleteApp(tempApp);
         
-        log(`Successfully created ${email}.`);
+        updateLog(`Successfully created ${email}.`);
         createdCount++;
       } catch (error: any) {
         handleGenerationError(error, i, email);
@@ -187,8 +188,11 @@ export default function AdminPage() {
   }
 
   async function handleMassDelete() {
-    setIsDeleting(true);
+    startOperation('deletion');
+    const updateLog = (message: string) => setLog(prev => [...prev, message]);
+
     try {
+        updateLog('Querying for developer-generated users...');
         const studentsQuery = query(collection(db, 'students'), where('dev_generated', '==', true));
         const teachersQuery = query(collection(db, 'teachers'), where('dev_generated', '==', true));
 
@@ -196,8 +200,10 @@ export default function AdminPage() {
             getDocs(studentsQuery),
             getDocs(teachersQuery)
         ]);
+        
+        const allUsers = [...studentSnap.docs, ...teacherSnap.docs];
 
-        if (studentSnap.empty && teacherSnap.empty) {
+        if (allUsers.length === 0) {
             toast({
                 title: 'No Users to Delete',
                 description: 'No developer-generated users were found in Firestore.',
@@ -205,16 +211,62 @@ export default function AdminPage() {
             setIsDeleting(false);
             return;
         }
+        updateLog(`Found ${allUsers.length} user(s) to delete.`);
 
         const batch = writeBatch(db);
-        studentSnap.forEach(doc => batch.delete(doc.ref));
-        teacherSnap.forEach(doc => batch.delete(doc.ref));
+        let deletedAuthCount = 0;
 
-        await batch.commit();
+        for (let i = 0; i < allUsers.length; i++) {
+            const userDoc = allUsers[i];
+            const userData = userDoc.data();
+            const email = userData.email;
+            const name = userData.name;
+            const role = userData.role;
+
+            updateLog(`\n[${i + 1}/${allUsers.length}] Processing ${email}...`);
+
+            try {
+                const number = name.split(' ').pop();
+                if (!number || !/^\d+$/.test(number)) {
+                    throw new Error(`Could not parse user number from name: "${name}"`);
+                }
+                const password = `${role}${number}`;
+                
+                const tempAppName = `deleter-${Date.now()}-${i}`;
+                const tempApp = initializeApp(firebaseConfig, tempAppName);
+                const tempAuth = getAuth(tempApp);
+                
+                const userCredential = await signInWithEmailAndPassword(tempAuth, email, password);
+                updateLog(`- Signed in as ${email}. Deleting auth account...`);
+                
+                await userCredential.user.delete();
+                updateLog(`- Auth account for ${email} deleted.`);
+                
+                await deleteApp(tempApp);
+
+                batch.delete(userDoc.ref);
+                updateLog(`- Firestore profile queued for deletion.`);
+                deletedAuthCount++;
+
+            } catch (error: any) {
+                updateLog(`- FAILED: ${error.message}`);
+                console.error(`Failed to delete user ${email}:`, error);
+            } finally {
+                setProgress(((i + 1) / allUsers.length) * 100);
+            }
+        }
+        
+        if (deletedAuthCount > 0) {
+            updateLog(`\nCommitting deletion of ${deletedAuthCount} Firestore profile(s)...`);
+            await batch.commit();
+            updateLog('Firestore profiles deleted.');
+        } else {
+            updateLog(`\nNo users were successfully deleted.`);
+        }
 
         toast({
             title: 'Deletion Complete',
-            description: `Deleted ${studentSnap.size} student and ${teacherSnap.size} teacher profiles from Firestore.`
+            description: `Deleted ${deletedAuthCount} of ${allUsers.length} users. See log for details.`
         });
     } catch (error: any) {
         console.error("Mass delete error:", error);
@@ -296,14 +348,14 @@ export default function AdminPage() {
                                 <FormField control={studentForm.control} name="grade" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Grade</FormLabel>
-                                        <FormControl><Input placeholder="e.g., 5" {...field} disabled={isGenerating} /></FormControl>
+                                        <FormControl><Input placeholder="e.g., 5" {...field} disabled={isGenerating || isDeleting} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}/>
                                 <FormField control={studentForm.control} name="section" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Section</FormLabel>
-                                        <FormControl><Input placeholder="e.g., B" {...field} disabled={isGenerating} /></FormControl>
+                                        <FormControl><Input placeholder="e.g., B" {...field} disabled={isGenerating || isDeleting} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}/>
@@ -311,11 +363,11 @@ export default function AdminPage() {
                             <FormField control={studentForm.control} name="count" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Number of Students</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 20" {...field} disabled={isGenerating} /></FormControl>
+                                    <FormControl><Input type="number" placeholder="e.g., 20" {...field} disabled={isGenerating || isDeleting} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}/>
-                            <Button type="submit" disabled={isGenerating}>
+                            <Button type="submit" disabled={isGenerating || isDeleting}>
                                 {isGenerating ? <LoadingSpinner className="mr-2" /> : null}
                                 Generate Students
                             </Button>
@@ -340,11 +392,11 @@ export default function AdminPage() {
                           <FormField control={teacherForm.control} name="count" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Number of Teachers</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 5" {...field} disabled={isGenerating} /></FormControl>
+                                    <FormControl><Input type="number" placeholder="e.g., 5" {...field} disabled={isGenerating || isDeleting} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}/>
-                            <Button type="submit" disabled={isGenerating}>
+                            <Button type="submit" disabled={isGenerating || isDeleting}>
                                 {isGenerating ? <LoadingSpinner className="mr-2" /> : null}
                                 Generate Teachers
                             </Button>
@@ -360,7 +412,7 @@ export default function AdminPage() {
                         <Trash2 className="h-8 w-8 text-destructive" />
                         <div>
                             <CardTitle className="font-headline text-2xl">Mass Delete Users</CardTitle>
-                            <CardDescription>Delete all developer-generated users from Firestore.</CardDescription>
+                            <CardDescription>Delete all developer-generated users.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -369,13 +421,13 @@ export default function AdminPage() {
                         <Terminal className="h-4 w-4" />
                         <AlertTitle>Heads up!</AlertTitle>
                         <AlertDescription>
-                          This action only deletes user profiles from the Firestore database. It does not delete the user accounts from Firebase Authentication, which must be done manually in the Firebase Console.
+                          This action will permanently delete both the Firestore profiles and the Firebase Authentication accounts for all users with the 'dev_generated' flag. This process can be slow and cannot be undone.
                         </AlertDescription>
                     </Alert>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="mt-4" disabled={isDeleting}>
-                            {isDeleting ? <LoadingSpinner className="mr-2" /> : <Trash2 />}
+                        <Button variant="destructive" className="mt-4" disabled={isGenerating || isDeleting}>
+                            {isDeleting ? <LoadingSpinner className="mr-2" /> : <Trash2 className="mr-2" />}
                             Mass Delete Generated Users
                         </Button>
                       </AlertDialogTrigger>
@@ -383,13 +435,13 @@ export default function AdminPage() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete all Firestore documents for users with the 'dev_generated' flag.
+                            This will permanently delete all generated user accounts and their associated data from Firebase Authentication and Firestore. This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction onClick={handleMassDelete} className="bg-destructive hover:bg-destructive/90">
-                            Yes, delete them
+                            Yes, delete them all
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -397,21 +449,23 @@ export default function AdminPage() {
                 </CardContent>
             </Card>
            
-            {isGenerating || generationLog.length > 0 ? (
+            {(isGenerating || isDeleting || log.length > 0) && (
                 <Card className="mt-8">
                     <CardHeader>
-                        <CardTitle>Generation Log</CardTitle>
-                        {isGenerating && <Progress value={progress} className="mt-2" />}
+                        <CardTitle>
+                            {isGenerating ? 'Generation Log' : (isDeleting ? 'Deletion Log' : 'Log')}
+                        </CardTitle>
+                        {(isGenerating || isDeleting) && <Progress value={progress} className="mt-2" />}
                     </CardHeader>
                     <CardContent>
                         <div className="h-64 overflow-y-auto rounded-md bg-muted p-4 font-mono text-xs">
-                            {generationLog.map((log, index) => (
-                                <p key={index}>{log}</p>
+                            {log.map((logEntry, index) => (
+                                <pre key={index} className="whitespace-pre-wrap">{logEntry}</pre>
                             ))}
                         </div>
                     </CardContent>
                 </Card>
-            ) : null}
+            )}
         </div>
     </div>
   );
