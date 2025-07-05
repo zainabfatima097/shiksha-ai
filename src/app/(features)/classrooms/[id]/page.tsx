@@ -16,17 +16,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
 });
-
-interface Member {
-  uid: string;
-  name: string;
-  role: 'teacher' | 'student';
-}
 
 interface Post {
   id: string;
@@ -39,7 +32,6 @@ interface Post {
 export default function ClassroomDetailPage({ params }: { params: { id: string } }) {
   const { user, profile, loading: authLoading } = useAuth();
   const [classroom, setClassroom] = useState<any>(null);
-  const [members, setMembers] = useState<Member[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -64,22 +56,11 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
       const classroomData = classroomSnap.data();
       setClassroom(classroomData);
 
-      const teacherIds: string[] = classroomData.teacherIds || [];
-      const studentIds: string[] = classroomData.studentIds || [];
-      
-      const memberPromises = [
-        ...teacherIds.map(id => getDoc(doc(db, 'teachers', id)).then(d => d.exists() ? ({ ...(d.data() as object), role: 'teacher' } as Member) : null)),
-        ...studentIds.map(id => getDoc(doc(db, 'students', id)).then(d => d.exists() ? ({ ...(d.data() as object), role: 'student' } as Member) : null))
-      ];
-
-      const resolvedMembers = await Promise.all(memberPromises);
-      setMembers(resolvedMembers.filter((m): m is Member => m !== null));
-
     } catch (error: any) {
       console.error("Error fetching classroom data:", error);
       let description = 'Could not load classroom data.';
       if (error.code === 'permission-denied') {
-          description = "You don't have permission to view classroom members. This is often fixed by updating Firestore security rules in your Firebase Console.";
+          description = "You don't have permission to view this classroom. This is often fixed by updating Firestore security rules in your Firebase Console.";
       }
       toast({ variant: 'destructive', title: 'Data Loading Error', description, duration: 9000 });
     } finally {
@@ -137,9 +118,6 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
      return <div className="flex items-center justify-center h-full"><p>Classroom not found.</p></div>;
   }
 
-  const teachers = members.filter(m => m.role === 'teacher');
-  const students = members.filter(m => m.role === 'student');
-
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b md:hidden">
@@ -147,75 +125,46 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
-          <div className="lg:col-span-2 flex flex-col h-full">
-            <Card className="flex-1 flex flex-col">
-              <CardHeader>
-                <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
-                <CardDescription>Updates and messages from your teachers.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
-                <div className="space-y-6">
-                  {posts.map(post => (
-                    <div key={post.id} className="flex items-start gap-4">
-                      <Avatar>
-                        <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                           <p className="font-semibold">{post.authorName}</p>
-                           <p className="text-xs text-muted-foreground">
-                                {post.createdAt ? new Date(post.createdAt?.toDate()).toLocaleString() : 'sending...'}
-                           </p>
-                        </div>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
+        <div className="h-full max-w-4xl mx-auto flex flex-col">
+          <Card className="flex-1 flex flex-col">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
+              <CardDescription>Updates and messages from your teachers.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
+              <div className="space-y-6">
+                {posts.map(post => (
+                  <div key={post.id} className="flex items-start gap-4">
+                    <Avatar>
+                      <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                         <p className="font-semibold">{post.authorName}</p>
+                         <p className="text-xs text-muted-foreground">
+                              {post.createdAt ? new Date(post.createdAt?.toDate()).toLocaleString() : 'sending...'}
+                         </p>
                       </div>
+                      <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
                     </div>
-                  ))}
-                  {posts.length === 0 && (
-                      <div className="text-center py-10 text-muted-foreground">No posts in this classroom yet.</div>
-                  )}
-                </div>
-              </CardContent>
-              {profile?.role === 'teacher' && (
-                <CardFooter className="pt-4 border-t">
-                  <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
-                      <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
-                      <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
-                        <Send className="h-4 w-4"/>
-                      </Button>
-                  </form>
-                </CardFooter>
-              )}
-            </Card>
-          </div>
-          <div className="lg:col-span-1 h-full flex flex-col">
-             <Card className="flex-1 flex flex-col overflow-hidden">
-                <CardHeader>
-                    <CardTitle className="font-headline">Members</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                    <Accordion type="multiple" defaultValue={['teachers', 'students']} className="w-full">
-                      <AccordionItem value="teachers">
-                        <AccordionTrigger className="font-semibold">Teachers ({teachers.length})</AccordionTrigger>
-                        <AccordionContent>
-                          <ul className="space-y-2 pt-2">
-                            {teachers.map(t => <li key={t.uid} className="text-sm pl-2">{t.name}</li>)}
-                          </ul>
-                        </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="students" className="border-b-0">
-                        <AccordionTrigger className="font-semibold">Students ({students.length})</AccordionTrigger>
-                        <AccordionContent>
-                          <ul className="space-y-2 pt-2 max-h-96 overflow-y-auto">
-                            {students.map(s => <li key={s.uid} className="text-sm pl-2">{s.name}</li>)}
-                          </ul>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                </CardContent>
-            </Card>
-          </div>
+                  </div>
+                ))}
+                {posts.length === 0 && (
+                    <div className="text-center py-10 text-muted-foreground">No posts in this classroom yet.</div>
+                )}
+              </div>
+            </CardContent>
+            {profile?.role === 'teacher' && (
+              <CardFooter className="pt-4 border-t">
+                <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
+                    <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
+                    <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
+                      <Send className="h-4 w-4"/>
+                    </Button>
+                </form>
+              </CardFooter>
+            )}
+          </Card>
         </div>
       </div>
     </div>
