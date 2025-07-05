@@ -8,7 +8,7 @@ import * as z from 'zod';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { cn } from '@/lib/utils';
 
 
 const lessonPlannerSchema = z.object({
@@ -244,177 +245,182 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        <div className="mb-8">
-            <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
-            {isHistoryLoading ? (
-                <div className="flex space-x-4">
-                <Skeleton className="h-28 flex-1 rounded-lg" />
-                <Skeleton className="h-28 flex-1 rounded-lg md:block hidden" />
-                <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
-                </div>
-            ) : history.length > 0 ? (
-            <Carousel opts={{ align: "start", loop: false }} className="w-full sm:px-8">
-                <CarouselContent className="-ml-2">
-                {history.map((item, index) => (
-                    <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
-                    <div className="p-1">
-                        <Card
-                        className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
-                        onClick={() => handleHistoryClick(item)}
-                        >
-                        <CardHeader>
-                            <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
-                            <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
-                        </CardHeader>
-                        </Card>
+        <div className="max-w-7xl mx-auto">
+            <div className="mb-8">
+                <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
+                {isHistoryLoading ? (
+                    <div className="flex space-x-4">
+                    <Skeleton className="h-28 flex-1 rounded-lg" />
+                    <Skeleton className="h-28 flex-1 rounded-lg md:block hidden" />
+                    <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
                     </div>
-                    </CarouselItem>
-                ))}
-                </CarouselContent>
-                <CarouselPrevious className="hidden sm:flex" />
-                <CarouselNext className="hidden sm:flex" />
-            </Carousel>
-            ) : (
-                <Card className="bg-secondary/50 border-dashed">
-                    <CardContent className="p-6">
-                        <p className="text-center text-muted-foreground">You have no recent lesson plans. Generate one below to get started!</p>
-                    </CardContent>
-                </Card>
-            )}
-        </div>
+                ) : history.length > 0 ? (
+                <Carousel opts={{ align: "start", loop: false }} className="w-full sm:px-8">
+                    <CarouselContent className="-ml-2">
+                    {history.map((item, index) => (
+                        <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
+                        <div className="p-1">
+                            <Card
+                            className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
+                            onClick={() => handleHistoryClick(item)}
+                            >
+                            <CardHeader>
+                                <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
+                                <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
+                            </CardHeader>
+                            </Card>
+                        </div>
+                        </CarouselItem>
+                    ))}
+                    </CarouselContent>
+                    <CarouselPrevious className="hidden sm:flex" />
+                    <CarouselNext className="hidden sm:flex" />
+                </Carousel>
+                ) : (
+                    <Card className="bg-secondary/50 border-dashed">
+                        <CardContent className="p-6">
+                            <p className="text-center text-muted-foreground">You have no recent lesson plans. Generate one below to get started!</p>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
-            <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="subject"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Subject</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Science" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="topic"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Topic</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., The Water Cycle" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="gradeLevel"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Grade Level</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., 4th Grade" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="localLanguage"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Language</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a language" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="English">English</SelectItem>
-                            <SelectItem value="Hindi">Hindi</SelectItem>
-                            <SelectItem value="Marathi">Marathi</SelectItem>
-                            <SelectItem value="Bengali">Bengali</SelectItem>
-                            <SelectItem value="Tamil">Tamil</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="learningObjectives"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Learning Objectives</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="additionalDetails"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Additional Details (Optional)</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="e.g., Focus on local examples of water sources." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
-                  Generate Plan
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-          {lessonPlan && (
-             <CardFooter>
-              <Card className="w-full bg-secondary/50" ref={lessonPlanRef}>
+            <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-8 items-start")}>
+              <Card>
                 <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleExportToPdf}
-                      disabled={isLoading}
-                      aria-label="Export to PDF"
-                    >
-                      <Download className="h-5 w-5" />
-                    </Button>
-                  </div>
+                  <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
+                  <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <ReactMarkdown>{lessonPlan}</ReactMarkdown>
-                  </div>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FormField
+                          control={form.control}
+                          name="subject"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Subject</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., Science" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="topic"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Topic</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., The Water Cycle" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="gradeLevel"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Grade Level</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g., 4th Grade" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="localLanguage"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Language</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a language" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="English">English</SelectItem>
+                                  <SelectItem value="Hindi">Hindi</SelectItem>
+                                  <SelectItem value="Marathi">Marathi</SelectItem>
+                                  <SelectItem value="Bengali">Bengali</SelectItem>
+                                  <SelectItem value="Tamil">Tamil</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="learningObjectives"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Learning Objectives</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="additionalDetails"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Additional Details (Optional)</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="e.g., Focus on local examples of water sources." {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" disabled={isLoading}>
+                        {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
+                        Generate Plan
+                      </Button>
+                    </form>
+                  </Form>
                 </CardContent>
               </Card>
-             </CardFooter>
-          )}
-        </Card>
+
+              {lessonPlan && (
+                <div className="lg:sticky lg:top-8">
+                  <Card className="w-full bg-secondary/50" ref={lessonPlanRef}>
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleExportToPdf}
+                          disabled={isLoading}
+                          aria-label="Export to PDF"
+                        >
+                          <Download className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown>{lessonPlan}</ReactMarkdown>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+        </div>
       </div>
     </div>
   );
