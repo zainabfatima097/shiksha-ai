@@ -23,12 +23,13 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
-import { Download, BookText } from 'lucide-react';
+import { Download, BookText, Share2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 
 const lessonPlannerSchema = z.object({
@@ -42,6 +43,12 @@ const lessonPlannerSchema = z.object({
 
 type LessonPlannerFormValues = z.infer<typeof lessonPlannerSchema>;
 
+interface Classroom {
+  id: string;
+  grade: string;
+  section: string;
+}
+
 export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
@@ -52,6 +59,12 @@ export default function LessonPlannerPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const lessonPlanRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  
+  const [isSharing, setIsSharing] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [selectedClassroom, setSelectedClassroom] = useState('');
+
 
   useEffect(() => {
     if (!authLoading && profile && profile.role !== 'teacher') {
@@ -116,13 +129,36 @@ export default function LessonPlannerPage() {
     }
   }, [toast]);
 
+  const fetchClassrooms = useCallback(async (uid: string) => {
+    if (!db) return;
+    try {
+      const teacherRef = doc(db, 'teachers', uid);
+      const teacherSnap = await getDoc(teacherRef);
+      if (teacherSnap.exists()) {
+        const teacherData = teacherSnap.data();
+        if (teacherData.classroomIds && teacherData.classroomIds.length > 0) {
+          const classroomPromises = teacherData.classroomIds.map((id: string) => getDoc(doc(db, 'classrooms', id)));
+          const classroomDocs = await Promise.all(classroomPromises);
+          const classroomsData = classroomDocs
+            .filter(d => d.exists())
+            .map(d => ({ id: d.id, ...d.data() } as Classroom));
+          setClassrooms(classroomsData);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching classrooms:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not load your classrooms for sharing.' });
+    }
+  }, [toast]);
+
   useEffect(() => {
     if (user && profile?.role === 'teacher') {
       fetchHistory(user.uid);
+      fetchClassrooms(user.uid);
     } else if (!authLoading) {
       setIsHistoryLoading(false);
     }
-  }, [user, profile, authLoading, fetchHistory]);
+  }, [user, profile, authLoading, fetchHistory, fetchClassrooms]);
 
 
   async function onSubmit(values: LessonPlannerFormValues) {
@@ -228,6 +264,48 @@ export default function LessonPlannerPage() {
       });
   };
 
+  const handleShare = async () => {
+    if (!user || !profile || !selectedClassroom || !lessonPlan) {
+      toast({
+        variant: "destructive",
+        title: "Sharing Error",
+        description: "Missing user, classroom, or lesson plan information."
+      });
+      return;
+    }
+
+    setIsSharing(true);
+    try {
+      const topic = form.getValues('topic');
+      const postContent = `**New Lesson Plan: ${topic}**\n\n${lessonPlan}`;
+
+      await addDoc(collection(db, 'classrooms', selectedClassroom, 'posts'), {
+        authorId: user.uid,
+        authorName: profile.name,
+        content: postContent,
+        createdAt: serverTimestamp(),
+      });
+      
+      const classroom = classrooms.find(c => c.id === selectedClassroom);
+      toast({
+        title: 'Success',
+        description: `Lesson plan shared with Grade ${classroom?.grade} - Section ${classroom?.section}.`,
+      });
+      setIsShareDialogOpen(false);
+      setSelectedClassroom('');
+
+    } catch (error) {
+      console.error("Error sharing lesson plan:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not share the lesson plan. Please try again.',
+      });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   if (authLoading || !profile || profile.role !== 'teacher') {
     return (
         <div className="flex items-center justify-center h-full">
@@ -253,7 +331,7 @@ export default function LessonPlannerPage() {
                     <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
                     </div>
                 ) : history.length > 0 ? (
-                <Carousel opts={{ align: "start", loop: false }} className="w-full">
+                <Carousel opts={{ align: "start", loop: false, dragFree: true }} className="w-full">
                     <CarouselContent className="-ml-2">
                     {history.map((item, index) => (
                         <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
@@ -415,15 +493,62 @@ export default function LessonPlannerPage() {
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
-                                    <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={handleExportToPdf}
-                                    disabled={isPdfLoading}
-                                    aria-label="Export to PDF"
-                                    >
-                                    {isPdfLoading ? <LoadingSpinner className="h-5 w-5"/> : <Download className="h-5 w-5" />}
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={handleExportToPdf}
+                                            disabled={isPdfLoading}
+                                            aria-label="Export to PDF"
+                                            title="Export to PDF"
+                                        >
+                                            {isPdfLoading ? <LoadingSpinner className="h-5 w-5"/> : <Download className="h-5 w-5" />}
+                                        </Button>
+
+                                        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    disabled={!lessonPlan || classrooms.length === 0} 
+                                                    aria-label="Share to classroom" 
+                                                    title="Share to classroom"
+                                                >
+                                                    <Share2 className="h-5 w-5" />
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Share Lesson Plan</DialogTitle>
+                                                    <DialogDescription>
+                                                        Select a classroom to post this lesson plan to their feed.
+                                                        {classrooms.length === 0 && <span className="text-destructive block mt-2">You have not joined any classrooms.</span>}
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="py-4">
+                                                    <Select onValueChange={setSelectedClassroom} defaultValue={selectedClassroom}>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select a classroom..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {classrooms.map(c => (
+                                                                <SelectItem key={c.id} value={c.id}>
+                                                                    Grade {c.grade} - Section {c.section}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>Cancel</Button>
+                                                    <Button onClick={handleShare} disabled={!selectedClassroom || isSharing}>
+                                                        {isSharing && <LoadingSpinner className="mr-2 h-4 w-4" />}
+                                                        Share
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
