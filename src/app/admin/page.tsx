@@ -105,44 +105,80 @@ export default function AdminPage() {
     let createdCount = 0;
     const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
-    for (let i = 1; i <= values.count; i++) {
-      const email = `student${i}@example.com`;
-      const password = `student${i}`;
+    try {
+        updateLog(`Querying for existing students in Grade ${values.grade} Section ${values.section}...`);
+        const studentsQuery = query(collection(db, 'students'), where('class', '==', values.grade), where('section', '==', values.section));
+        const querySnapshot = await getDocs(studentsQuery);
 
-      try {
-        updateLog(`Creating student ${i}/${values.count}: ${email}...`);
-        
-        const tempAppName = `student-creator-${Date.now()}-${i}`;
-        const tempApp = initializeApp(firebaseConfig, tempAppName);
-        const tempAuth = getAuth(tempApp);
+        let lastRollNumber = 0;
+        querySnapshot.forEach((doc) => {
+            const studentData = doc.data();
+            if (studentData.rollNumber) {
+                const currentRollNumber = parseInt(studentData.rollNumber, 10);
+                if (!isNaN(currentRollNumber) && currentRollNumber > lastRollNumber) {
+                    lastRollNumber = currentRollNumber;
+                }
+            }
+        });
 
-        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
-        const user = userCredential.user;
+        updateLog(`Highest existing roll number is ${lastRollNumber}. Starting new students from ${lastRollNumber + 1}.`);
 
-        const studentData = {
-          uid: user.uid,
-          email,
-          name: `Student ${i}`,
-          role: 'student',
-          class: values.grade,
-          section: values.section,
-          rollNumber: String(i),
-          dev_generated: true,
-        };
+        for (let i = 0; i < values.count; i++) {
+            const rollNumber = lastRollNumber + i + 1;
+            const email = `student${rollNumber}@example.com`;
+            const password = `student${rollNumber}`;
+            const name = `Student ${rollNumber}`;
+            
+            try {
+                updateLog(`[${i + 1}/${values.count}] Creating student: ${email}...`);
+                
+                const tempAppName = `student-creator-${Date.now()}-${rollNumber}`;
+                const tempApp = initializeApp(firebaseConfig, tempAppName);
+                const tempAuth = getAuth(tempApp);
 
-        await setDoc(doc(db, 'students', user.uid), studentData);
-        await deleteApp(tempApp);
-        
-        updateLog(`Successfully created ${email} with roll number ${i}.`);
-        createdCount++;
-      } catch (error: any) {
-        handleGenerationError(error, i, email);
-        return;
-      } finally {
-        setProgress(((i) / values.count) * 100);
-      }
+                const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+                const user = userCredential.user;
+
+                const studentData = {
+                    uid: user.uid,
+                    email,
+                    name,
+                    role: 'student',
+                    class: values.grade,
+                    section: values.section,
+                    rollNumber: String(rollNumber),
+                    dev_generated: true,
+                };
+
+                await setDoc(doc(db, 'students', user.uid), studentData);
+                await deleteApp(tempApp);
+                
+                updateLog(`- Successfully created ${email} with roll number ${rollNumber}.`);
+                createdCount++;
+            } catch (error: any) {
+                handleGenerationError(error, i + 1, email);
+                return; // Stop generation on first error
+            } finally {
+                setProgress(((i + 1) / values.count) * 100);
+            }
+        }
+        endGeneration(createdCount, values.count, 'student');
+    } catch (error: any) {
+        console.error("Failed to query for students:", error);
+        let description = 'Could not query existing students. An unknown error occurred.';
+         if (error.code === 'failed-precondition') {
+            description = `A Firestore index is required. Please create it in your Firebase console. The error was: "${error.message}"`;
+        } else if (error.code === 'permission-denied') {
+            description = 'Permission denied. Please check your Firestore security rules to ensure you can query the "students" collection.';
+        }
+        toast({
+            variant: 'destructive',
+            title: 'Generation Failed',
+            description,
+            duration: 9000,
+        });
+        setIsGenerating(false);
     }
-    endGeneration(createdCount, values.count, 'student');
   }
 
   async function onTeacherSubmit(values: z.infer<typeof teacherGenerationSchema>) {
