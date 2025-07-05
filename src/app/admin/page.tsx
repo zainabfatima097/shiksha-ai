@@ -106,7 +106,7 @@ export default function AdminPage() {
     const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
     for (let i = 1; i <= values.count; i++) {
-      const email = `student${i + Date.now()}@example.com`;
+      const email = `student${i}@example.com`;
       const password = `student${i}`;
 
       try {
@@ -151,7 +151,7 @@ export default function AdminPage() {
     const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
     for (let i = 1; i <= values.count; i++) {
-      const email = `teacher${i + Date.now()}@example.com`;
+      const email = `teacher${i}@example.com`;
       const password = `teacher${i}`;
 
       try {
@@ -470,3 +470,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
