@@ -107,28 +107,28 @@ export default function ClassroomsPage() {
           <SidebarTrigger />
         </header>
         <div className="flex-1 p-4 md:p-8 overflow-auto">
-          <Card className="max-w-4xl mx-auto">
+          <Card className="max-w-4xl mx-auto flex flex-col h-full">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Your Classroom</CardTitle>
               <CardDescription>View messages and updates from your teachers.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex items-center justify-center">
               {studentClassroom ? (
-                <Link href={`/classrooms/${studentClassroom.id}`} passHref>
+                <Link href={`/classrooms/${studentClassroom.id}`} passHref className="w-full max-w-lg">
                   <Card className="hover:bg-accent cursor-pointer transition-colors">
-                    <CardHeader>
+                    <CardHeader className="p-8">
                       <div className="flex justify-between items-center">
                         <div>
                           <CardTitle>Grade {studentClassroom.grade} - Section {studentClassroom.section}</CardTitle>
-                          <CardDescription>Click to enter</CardDescription>
+                          <CardDescription className="mt-1">Click to enter</CardDescription>
                         </div>
-                        <ArrowRight className="h-5 w-5 text-muted-foreground"/>
+                        <ArrowRight className="h-6 w-6 text-muted-foreground"/>
                       </div>
                     </CardHeader>
                   </Card>
                 </Link>
               ) : (
-                <p>You are not currently assigned to a classroom.</p>
+                <p className="text-muted-foreground">You are not currently assigned to a classroom.</p>
               )}
             </CardContent>
           </Card>
