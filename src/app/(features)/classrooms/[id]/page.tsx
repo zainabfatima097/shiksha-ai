@@ -11,12 +11,13 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send } from 'lucide-react';
+import { Send, BookText, Sheet, ImageIcon } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Link from 'next/link';
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -147,7 +148,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-full">
           <div className="lg:col-span-2 flex flex-col h-full">
             <Card className="flex-1 flex flex-col">
               <CardHeader>
@@ -211,6 +212,36 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
                 </CardContent>
             </Card>
           </div>
+           {profile?.role === 'teacher' && (
+            <div className="h-full flex-col hidden lg:flex">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-headline">Classroom Tools</CardTitle>
+                  <CardDescription>Quick links to other features.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col space-y-2">
+                  <Link href="/lesson-planner" passHref>
+                    <Button variant="outline" className="w-full justify-start">
+                      <BookText className="mr-2 h-4 w-4" />
+                      Lesson Planner
+                    </Button>
+                  </Link>
+                  <Link href="/differentiated-worksheets" passHref>
+                    <Button variant="outline" className="w-full justify-start">
+                      <Sheet className="mr-2 h-4 w-4" />
+                      Worksheets
+                    </Button>
+                  </Link>
+                  <Link href="/visual-aids" passHref>
+                    <Button variant="outline" className="w-full justify-start">
+                      <ImageIcon className="mr-2 h-4 w-4" />
+                      Visual Aids
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+           )}
         </div>
       </div>
     </div>
