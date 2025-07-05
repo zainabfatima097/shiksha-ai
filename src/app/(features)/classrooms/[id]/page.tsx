@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -17,6 +16,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { cn } from '@/lib/utils';
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -151,11 +151,20 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b md:hidden">
         <h1 className="font-headline text-xl font-bold text-primary truncate">Grade {classroom.grade} - Section {classroom.section}</h1>
-        <SidebarTrigger />
+         <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="shrink-0">
+                <Users className="mr-2 h-4 w-4"/>
+                <span>{showMembers ? 'Hide' : 'Members'}</span>
+            </Button>
+            <SidebarTrigger />
+        </div>
       </header>
-      <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
-          <div className="flex-1 min-w-0">
+      <div className="flex-1 p-4 md:p-8 overflow-auto">
+        <div className="h-full max-w-7xl mx-auto grid lg:grid-cols-3 gap-8">
+          <div className={cn(
+                "min-w-0",
+                showMembers ? "lg:col-span-2" : "lg:col-span-3"
+            )}>
             <Card className="flex flex-col h-full">
                 <CardHeader>
                     <div className="flex justify-between items-center">
@@ -163,7 +172,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
                         <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
                         <CardDescription>Updates and messages from your teachers.</CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="shrink-0">
+                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="shrink-0 hidden md:flex">
                             <Users className="mr-2 h-4 w-4"/>
                             {showMembers ? 'Hide Members' : 'View Members'}
                         </Button>
@@ -205,7 +214,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
             </Card>
           </div>
           {showMembers && (
-            <div className="w-full lg:w-80 lg:shrink-0">
+            <div className="lg:col-span-1">
                 <Card className="h-full">
                     <CardHeader>
                         <CardTitle>Members</CardTitle>
