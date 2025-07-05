@@ -1,71 +1,62 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
+    match /teachers/{teacherId} {
+      // Any logged-in user can read teacher profiles. Needed for classroom member lists.
+      allow read: if request.auth != null;
+      // Teachers can only create or update their OWN profile.
+      allow create, update: if request.auth != null && request.auth.uid == teacherId;
+      
+      // Allow unauthenticated admin panel to read, create, and delete test users.
+      // WARNING: Remove for production.
+      allow read, create, delete: if request.auth == null;
+
+      match /lessonHistory/{docId} {
+        allow read, create: if request.auth != null && request.auth.uid == teacherId;
+      }
     }
 
-    function isTeacher() {
-      return isSignedIn() && get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher';
-    }
-
-    function isStudent() {
-      return isSignedIn() && get(/databases/$(database)/documents/students/$(request.auth.uid)).data.role == 'student';
-    }
-
-    function getTeacherProfile(uid) {
-      return get(/databases/$(database)/documents/teachers/$(uid)).data;
+    match /students/{studentId} {
+       // Any logged-in user can read student profiles.
+       allow read: if request.auth != null;
+       // Students can only create or update their OWN profile.
+       allow create, update: if request.auth != null && request.auth.uid == studentId;
+       
+       // Allow unauthenticated admin panel to read, create, and delete test users.
+       // WARNING: Remove for production.
+       allow read, create, delete: if request.auth == null;
     }
     
-    function getStudentProfile(uid) {
-      return get(/databases/$(database)/documents/students/$(uid)).data;
-    }
-
-    // Default deny all access
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Allow anyone to sign up
-    match /teachers/{userId} {
-      allow create: if isSignedIn();
-      allow read: if isSignedIn();
-      allow update: if isSignedIn() && request.auth.uid == userId;
-    }
-
-    match /students/{userId} {
-      allow create: if isSignedIn();
-      allow read: if isSignedIn();
-      allow update: if isSignedIn() && request.auth.uid == userId;
-    }
-
     match /classrooms/{classroomId} {
-      allow read: if isSignedIn();
-      // Allow a teacher to join or leave a classroom (update the teacherIds array)
-      allow update: if isTeacher();
-    }
-    
-    match /classrooms/{classroomId}/posts/{postId} {
-      allow list, get: if isSignedIn();
-      // Allow teachers who are part of the classroom to create posts
-      allow create: if isTeacher() && classroomId in getTeacherProfile(request.auth.uid).classroomIds;
-      // Allow the teacher who created the post to delete it
-      allow delete: if isTeacher() && request.auth.uid == resource.data.authorId;
+      // Any authenticated user can read classroom lists.
+      allow read: if request.auth != null;
+
+      // Allows teachers to join/leave classrooms and students to be added on signup.
+      // WARNING: This rule is permissive. For production, restrict this further.
+      allow update: if request.auth != null; 
+      
+      // Allow admin panel to create/update classrooms when generating students.
+      allow create, update: if request.auth == null;
     }
 
-    match /teachers/{teacherId}/lessonHistory/{historyId} {
-      // Only the teacher can access their own lesson history
-      allow read, list, create: if request.auth.uid == teacherId;
+    match /classrooms/{classroomId}/posts/{postId} {
+      // Any authenticated user can read posts.
+      allow read: if request.auth != null;
+
+      // Only teachers in the classroom can create posts.
+      allow create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds;
+      
+      // Only the author of the post can delete it.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
     }
 
     match /lessonPlans/{lessonPlanId} {
-      allow get: if isSignedIn();
-      // Only teachers can create new lesson plans
-      allow create: if isTeacher();
+      // Any authenticated user can view a shared lesson plan.
+      allow read: if request.auth != null;
+      // Only teachers can create (share) new lesson plans.
+      allow create: if request.auth != null && get(/databases/$(database)/documents/teachers/$(request.auth.uid)).exists;
     }
   }
 }
