@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -10,13 +11,14 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Users } from 'lucide-react';
+import { Send, Users, ArrowRight, BookOpenCheck } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -26,8 +28,12 @@ interface Post {
   id: string;
   authorId: string;
   authorName: string;
-  content: string;
+  content?: string;
   createdAt: any; // Firestore timestamp
+  type?: 'message' | 'lessonPlan';
+  lessonPlanId?: string;
+  topic?: string;
+  subject?: string;
 }
 
 // Minimal profile types for members list
@@ -131,6 +137,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         authorName: profile.name,
         content: values.message,
         createdAt: serverTimestamp(),
+        type: 'message',
       });
       form.reset();
     } catch (error) {
@@ -160,100 +167,123 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         </div>
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        <div className="h-full max-w-7xl mx-auto grid lg:grid-cols-3 gap-8">
-          <div className={cn(
-                "min-w-0",
-                showMembers ? "lg:col-span-2" : "lg:col-span-3"
-            )}>
-            <Card className="flex flex-col h-full">
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                        <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
-                        <CardDescription>Updates and messages from your teachers.</CardDescription>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="shrink-0 hidden md:flex">
-                            <Users className="mr-2 h-4 w-4"/>
-                            {showMembers ? 'Hide Members' : 'View Members'}
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
-                <div className="space-y-6">
-                    {posts.map(post => (
-                    <div key={post.id} className="flex items-start gap-4">
-                        <Avatar>
-                        <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                            <p className="font-semibold">{post.authorName}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {post.createdAt ? new Date(post.createdAt?.toDate()).toLocaleString() : 'sending...'}
-                            </p>
-                        </div>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
-                        </div>
-                    </div>
-                    ))}
-                    {posts.length === 0 && (
-                        <div className="text-center py-10 text-muted-foreground">No posts in this classroom yet.</div>
-                    )}
-                </div>
-                </CardContent>
-                {profile?.role === 'teacher' && (
-                <CardFooter className="pt-4 border-t">
-                    <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
-                        <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
-                        <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
-                        <Send className="h-4 w-4"/>
-                        </Button>
-                    </form>
-                </CardFooter>
-                )}
-            </Card>
-          </div>
-          {showMembers && (
-            <div className="lg:col-span-1">
-                <Card className="h-full">
+        <div className="h-full max-w-7xl mx-auto flex gap-8">
+            <div className="flex-1 min-w-0">
+                <Card className="flex flex-col h-full">
                     <CardHeader>
-                        <CardTitle>Members</CardTitle>
-                        <CardDescription>{teachers.length} Teacher(s), {students.length} Student(s)</CardDescription>
+                        <div className="flex justify-between items-center">
+                            <div>
+                            <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
+                            <CardDescription>Updates and messages from your teachers.</CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="shrink-0 hidden md:flex">
+                                <Users className="mr-2 h-4 w-4"/>
+                                {showMembers ? 'Hide Members' : 'View Members'}
+                            </Button>
+                        </div>
                     </CardHeader>
-                    <CardContent className="overflow-y-auto" style={{maxHeight: "calc(100vh - 200px)"}}>
-                        <Accordion type="single" collapsible defaultValue="teachers" className="w-full">
-                            <AccordionItem value="teachers">
-                                <AccordionTrigger>Teachers</AccordionTrigger>
-                                <AccordionContent>
-                                    <ul className="space-y-3 pt-2">
-                                    {teachers.length > 0 ? teachers.map(teacher => (
-                                        <li key={teacher.uid} className="flex items-center gap-2 text-sm">
-                                            <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{teacher.name.charAt(0)}</AvatarFallback></Avatar>
-                                            {teacher.name}
-                                        </li>
-                                    )) : <li className="text-sm text-muted-foreground">No teachers found.</li>}
-                                    </ul>
-                                </AccordionContent>
-                            </AccordionItem>
-                             <AccordionItem value="students">
-                                <AccordionTrigger>Students</AccordionTrigger>
-                                <AccordionContent>
-                                     <ul className="space-y-3 pt-2">
-                                    {students.length > 0 ? students.sort((a, b) => (parseInt(a.rollNumber || '0') - parseInt(b.rollNumber || '0'))).map(student => (
-                                        <li key={student.uid} className="flex items-center gap-2 text-sm">
-                                            <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{student.name.charAt(0)}</AvatarFallback></Avatar>
-                                            <span className="flex-1 truncate">{student.name}</span>
-                                            <span className="text-muted-foreground">#{student.rollNumber}</span>
-                                        </li>
-                                    )) : <li className="text-sm text-muted-foreground">No students found.</li>}
-                                    </ul>
-                                </AccordionContent>
-                            </AccordionItem>
-                        </Accordion>
+                    <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
+                    <div className="space-y-6">
+                        {posts.map(post => (
+                        <div key={post.id} className="flex items-start gap-4">
+                            <Avatar>
+                                <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <p className="font-semibold">{post.authorName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {post.createdAt ? new Date(post.createdAt?.toDate()).toLocaleString() : 'sending...'}
+                                    </p>
+                                </div>
+                                {post.type === 'lessonPlan' ? (
+                                    <Card className="mt-2 bg-background">
+                                        <CardContent className="p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <BookOpenCheck className="h-6 w-6 text-primary shrink-0" />
+                                                    <div>
+                                                        <p className="font-semibold text-sm">{post.topic}</p>
+                                                        <p className="text-xs text-muted-foreground">A new lesson plan was shared.</p>
+                                                    </div>
+                                                </div>
+                                                <Link href={`/lesson-plans/${post.lessonPlanId}`} passHref>
+                                                    <Button size="sm" variant="outline">
+                                                        View
+                                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
+                                )}
+                            </div>
+                        </div>
+                        ))}
+                        {posts.length === 0 && (
+                            <div className="text-center py-10 text-muted-foreground">No posts in this classroom yet.</div>
+                        )}
+                    </div>
                     </CardContent>
+                    {profile?.role === 'teacher' && (
+                    <CardFooter className="pt-4 border-t">
+                        <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
+                            <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
+                            <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
+                            <Send className="h-4 w-4"/>
+                            </Button>
+                        </form>
+                    </CardFooter>
+                    )}
                 </Card>
             </div>
-          )}
+
+            <div className={cn(
+                "transition-all duration-300 ease-in-out",
+                showMembers ? "w-80" : "w-0"
+            )}>
+                 {showMembers && (
+                    <Card className="h-full w-80 shrink-0">
+                        <CardHeader>
+                            <CardTitle>Members</CardTitle>
+                            <CardDescription>{teachers.length} Teacher(s), {students.length} Student(s)</CardDescription>
+                        </CardHeader>
+                        <CardContent className="overflow-y-auto" style={{maxHeight: "calc(100vh - 200px)"}}>
+                            <Accordion type="single" collapsible defaultValue="teachers" className="w-full">
+                                <AccordionItem value="teachers">
+                                    <AccordionTrigger>Teachers</AccordionTrigger>
+                                    <AccordionContent>
+                                        <ul className="space-y-3 pt-2">
+                                        {teachers.length > 0 ? teachers.map(teacher => (
+                                            <li key={teacher.uid} className="flex items-center gap-2 text-sm">
+                                                <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{teacher.name.charAt(0)}</AvatarFallback></Avatar>
+                                                {teacher.name}
+                                            </li>
+                                        )) : <li className="text-sm text-muted-foreground">No teachers found.</li>}
+                                        </ul>
+                                    </AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="students">
+                                    <AccordionTrigger>Students</AccordionTrigger>
+                                    <AccordionContent>
+                                        <ul className="space-y-3 pt-2">
+                                        {students.length > 0 ? students.sort((a, b) => (parseInt(a.rollNumber || '0') - parseInt(b.rollNumber || '0'))).map(student => (
+                                            <li key={student.uid} className="flex items-center gap-2 text-sm">
+                                                <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{student.name.charAt(0)}</AvatarFallback></Avatar>
+                                                <span className="flex-1 truncate">{student.name}</span>
+                                                <span className="text-muted-foreground">#{student.rollNumber}</span>
+                                            </li>
+                                        )) : <li className="text-sm text-muted-foreground">No students found.</li>}
+                                        </ul>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
         </div>
       </div>
     </div>

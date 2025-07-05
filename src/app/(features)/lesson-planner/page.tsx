@@ -276,15 +276,30 @@ export default function LessonPlannerPage() {
 
     setIsSharing(true);
     try {
-      const topic = form.getValues('topic');
-      const postContent = `**New Lesson Plan: ${topic}**\n\n${lessonPlan}`;
-
-      await addDoc(collection(db, 'classrooms', selectedClassroom, 'posts'), {
+      // 1. Create the main lesson plan document in a new collection
+      const lessonPlanData = {
         authorId: user.uid,
         authorName: profile.name,
-        content: postContent,
         createdAt: serverTimestamp(),
-      });
+        subject: form.getValues('subject'),
+        topic: form.getValues('topic'),
+        gradeLevel: form.getValues('gradeLevel'),
+        weeklyPlan: lessonPlan,
+      };
+      const lessonPlanRef = await addDoc(collection(db, 'lessonPlans'), lessonPlanData);
+
+      // 2. Create a post in the classroom feed that links to the lesson plan
+      const postData = {
+        authorId: user.uid,
+        authorName: profile.name,
+        createdAt: serverTimestamp(),
+        type: 'lessonPlan',
+        lessonPlanId: lessonPlanRef.id,
+        topic: form.getValues('topic'),
+        subject: form.getValues('subject'),
+      };
+
+      await addDoc(collection(db, 'classrooms', selectedClassroom, 'posts'), postData);
       
       const classroom = classrooms.find(c => c.id === selectedClassroom);
       toast({
