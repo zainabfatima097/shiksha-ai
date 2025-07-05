@@ -42,9 +42,15 @@ export default function ClassroomsPage() {
           setJoinedClassrooms(teacherDoc.data().classroomIds || []);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching classrooms:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load classrooms.' });
+      let description = 'Could not load classrooms.';
+      if (error.code === 'permission-denied') {
+        description = "You don't have permission to view classrooms. Please check your Firestore security rules.";
+      } else if (error.code === 'failed-precondition') {
+        description = `A Firestore index is required for this query. Please create it in your Firebase console. The error was: "${error.message}"`;
+      }
+      toast({ variant: 'destructive', title: 'Error Loading Classrooms', description, duration: 9000 });
     } finally {
       setLoading(false);
     }
@@ -74,9 +80,13 @@ export default function ClassroomsPage() {
         setJoinedClassrooms(prev => [...prev, classroomId]);
         toast({ title: 'Success', description: 'You have joined the classroom.' });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error joining/leaving classroom:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'An error occurred. Please try again.' });
+      let description = 'An error occurred. Please try again.';
+      if (error.code === 'permission-denied') {
+        description = "You don't have permission to join or leave a classroom. Please check your Firestore security rules to allow teachers to update their own profile and the classroom's 'teacherIds'.";
+      }
+      toast({ variant: 'destructive', title: 'Update Error', description, duration: 9000 });
     }
   };
 
