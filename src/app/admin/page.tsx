@@ -104,7 +104,7 @@ export default function AdminPage() {
     let createdCount = 0;
 
     for (let i = 1; i <= values.count; i++) {
-      const email = `student${i}@example.com`;
+      const email = `student${i + Date.now()}@example.com`;
       const password = `student${i}`;
       const log = (message: string) => setGenerationLog(prev => [...prev, message]);
 
@@ -149,7 +149,7 @@ export default function AdminPage() {
     let createdCount = 0;
 
     for (let i = 1; i <= values.count; i++) {
-      const email = `teacher${i}@example.com`;
+      const email = `teacher${i + Date.now()}@example.com`;
       const password = `teacher${i}`;
       const log = (message: string) => setGenerationLog(prev => [...prev, message]);
 
