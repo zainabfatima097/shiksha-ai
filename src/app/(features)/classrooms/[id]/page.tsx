@@ -12,11 +12,11 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Send } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -147,8 +147,8 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-full">
-          <div className="lg:col-span-3 flex flex-col h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-full">
+          <div className="lg:col-span-2 flex flex-col h-full">
             <Card className="flex-1 flex flex-col">
               <CardHeader>
                 <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
@@ -190,24 +190,29 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
             </Card>
           </div>
           <div className="lg:col-span-1 h-full flex flex-col">
-             <Card className="flex-1">
+             <Card className="flex-1 flex flex-col overflow-hidden">
                 <CardHeader>
                     <CardTitle className="font-headline">Members</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <h4 className="font-semibold mb-2">Teachers ({teachers.length})</h4>
-                        <ul className="space-y-2">
-                            {teachers.map(t => <li key={t.uid} className="text-sm">{t.name}</li>)}
-                        </ul>
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold mb-2">Students ({students.length})</h4>
-                         <ul className="space-y-2 max-h-80 overflow-y-auto">
-                            {students.map(s => <li key={s.uid} className="text-sm">{s.name}</li>)}
-                        </ul>
-                    </div>
+                <CardContent className="flex-1 overflow-y-auto">
+                    <Accordion type="multiple" defaultValue={['teachers', 'students']} className="w-full">
+                      <AccordionItem value="teachers">
+                        <AccordionTrigger className="font-semibold">Teachers ({teachers.length})</AccordionTrigger>
+                        <AccordionContent>
+                          <ul className="space-y-2 pt-2">
+                            {teachers.map(t => <li key={t.uid} className="text-sm pl-2">{t.name}</li>)}
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="students" className="border-b-0">
+                        <AccordionTrigger className="font-semibold">Students ({students.length})</AccordionTrigger>
+                        <AccordionContent>
+                          <ul className="space-y-2 pt-2 max-h-96 overflow-y-auto">
+                            {students.map(s => <li key={s.uid} className="text-sm pl-2">{s.name}</li>)}
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                 </CardContent>
             </Card>
           </div>
