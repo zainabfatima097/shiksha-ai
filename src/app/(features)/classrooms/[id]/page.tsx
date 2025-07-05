@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, addDoc, serverTimestamp, orderBy, onSnapshot } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -64,35 +64,34 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
       const classroomData = classroomSnap.data();
       setClassroom(classroomData);
 
-      const teacherIds = classroomData.teacherIds || [];
-      const studentIds = classroomData.studentIds || [];
-      const fetchedMembers: Member[] = [];
+      const teacherIds: string[] = classroomData.teacherIds || [];
+      const studentIds: string[] = classroomData.studentIds || [];
+      
+      const memberPromises = [
+        ...teacherIds.map(id => getDoc(doc(db, 'teachers', id)).then(d => d.exists() ? ({ ...(d.data() as object), role: 'teacher' } as Member) : null)),
+        ...studentIds.map(id => getDoc(doc(db, 'students', id)).then(d => d.exists() ? ({ ...(d.data() as object), role: 'student' } as Member) : null))
+      ];
 
-      if (teacherIds.length > 0) {
-        const teachersQuery = query(collection(db, 'teachers'), where('uid', 'in', teacherIds));
-        const teachersSnap = await getDocs(teachersQuery);
-        teachersSnap.forEach(doc => fetchedMembers.push({ ...doc.data(), role: 'teacher' } as Member));
-      }
-      if (studentIds.length > 0) {
-        const studentsQuery = query(collection(db, 'students'), where('uid', 'in', studentIds));
-        const studentsSnap = await getDocs(studentsQuery);
-        studentsSnap.forEach(doc => fetchedMembers.push({ ...doc.data(), role: 'student' } as Member));
-      }
-      setMembers(fetchedMembers);
+      const resolvedMembers = await Promise.all(memberPromises);
+      setMembers(resolvedMembers.filter((m): m is Member => m !== null));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching classroom data:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load classroom data.' });
+      let description = 'Could not load classroom data.';
+      if (error.code === 'permission-denied') {
+          description = "You don't have permission to view classroom members. This is often fixed by updating Firestore security rules in your Firebase Console.";
+      }
+      toast({ variant: 'destructive', title: 'Data Loading Error', description, duration: 9000 });
     } finally {
       setLoading(false);
     }
   }, [params.id, toast, user]);
 
   useEffect(() => {
-      if(!authLoading){
+      if(!authLoading && user){
           fetchClassroomData();
       }
-  }, [authLoading, fetchClassroomData]);
+  }, [authLoading, user, fetchClassroomData]);
   
   useEffect(() => {
     if(!db) return;
