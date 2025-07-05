@@ -25,7 +25,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { Download } from 'lucide-react';
+import { Download, BookText } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -46,6 +46,7 @@ type LessonPlannerFormValues = z.infer<typeof lessonPlannerSchema>;
 
 export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [lessonPlan, setLessonPlan] = useState('');
   const [history, setHistory] = useState<LessonPlanHistoryItem[]>([]);
@@ -188,7 +189,7 @@ export default function LessonPlannerPage() {
       return;
     }
 
-    setIsLoading(true);
+    setIsPdfLoading(true);
     html2canvas(input, { scale: 2, useCORS: true })
       .then((canvas) => {
         const imgData = canvas.toDataURL('image/png');
@@ -225,7 +226,7 @@ export default function LessonPlannerPage() {
         });
       })
       .finally(() => {
-        setIsLoading(false);
+        setIsPdfLoading(false);
       });
   };
 
@@ -244,7 +245,7 @@ export default function LessonPlannerPage() {
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-7xl mx-auto">
             <div className="mb-8">
                 <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
                 {isHistoryLoading ? (
@@ -284,139 +285,170 @@ export default function LessonPlannerPage() {
                 )}
             </div>
 
-            <Card>
-                <CardHeader>
-                <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
-                <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField
-                        control={form.control}
-                        name="subject"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Subject</FormLabel>
-                            <FormControl>
-                                <Input placeholder="e.g., Science" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="topic"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Topic</FormLabel>
-                            <FormControl>
-                                <Input placeholder="e.g., The Water Cycle" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="gradeLevel"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Grade Level</FormLabel>
-                            <FormControl>
-                                <Input placeholder="e.g., 4th Grade" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="localLanguage"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Language</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a language" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                <SelectItem value="English">English</SelectItem>
-                                <SelectItem value="Hindi">Hindi</SelectItem>
-                                <SelectItem value="Marathi">Marathi</SelectItem>
-                                <SelectItem value="Bengali">Bengali</SelectItem>
-                                <SelectItem value="Tamil">Tamil</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    </div>
-                    <FormField
-                        control={form.control}
-                        name="learningObjectives"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Learning Objectives</FormLabel>
-                            <FormControl>
-                            <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="additionalDetails"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Additional Details (Optional)</FormLabel>
-                            <FormControl>
-                            <Textarea placeholder="e.g., Focus on local examples of water sources." {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <Button type="submit" disabled={isLoading}>
-                        {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
-                        Generate Plan
-                    </Button>
-                    </form>
-                </Form>
-                </CardContent>
-            </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 items-start">
+              <Card className="lg:col-span-1">
+                  <CardHeader>
+                  <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
+                  <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                  <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField
+                          control={form.control}
+                          name="subject"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Subject</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="e.g., Science" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <FormField
+                          control={form.control}
+                          name="topic"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Topic</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="e.g., The Water Cycle" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <FormField
+                          control={form.control}
+                          name="gradeLevel"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Grade Level</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="e.g., 4th Grade" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <FormField
+                          control={form.control}
+                          name="localLanguage"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Language</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                  <SelectTrigger>
+                                      <SelectValue placeholder="Select a language" />
+                                  </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                  <SelectItem value="English">English</SelectItem>
+                                  <SelectItem value="Hindi">Hindi</SelectItem>
+                                  <SelectItem value="Marathi">Marathi</SelectItem>
+                                  <SelectItem value="Bengali">Bengali</SelectItem>
+                                  <SelectItem value="Tamil">Tamil</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                      </div>
+                      <FormField
+                          control={form.control}
+                          name="learningObjectives"
+                          render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Learning Objectives</FormLabel>
+                              <FormControl>
+                              <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                          )}
+                      />
+                      <FormField
+                          control={form.control}
+                          name="additionalDetails"
+                          render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Additional Details (Optional)</FormLabel>
+                              <FormControl>
+                              <Textarea placeholder="e.g., Focus on local examples of water sources." {...field} />
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                          )}
+                      />
+                      <Button type="submit" disabled={isLoading}>
+                          {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
+                          Generate Plan
+                      </Button>
+                      </form>
+                  </Form>
+                  </CardContent>
+              </Card>
 
-            {lessonPlan && (
-                <div className="mt-8">
-                <Card className="w-full bg-secondary/50" ref={lessonPlanRef}>
-                    <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
-                        <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleExportToPdf}
-                        disabled={isLoading}
-                        aria-label="Export to PDF"
-                        >
-                        <Download className="h-5 w-5" />
-                        </Button>
-                    </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <ReactMarkdown>{lessonPlan}</ReactMarkdown>
-                        </div>
-                    </CardContent>
-                </Card>
-                </div>
-            )}
+              <div className="lg:col-span-1 lg:sticky lg:top-8 self-start mt-8 lg:mt-0">
+                  {isLoading && (
+                      <Card>
+                        <CardHeader>
+                          <div className="flex justify-between items-center">
+                              <Skeleton className="h-6 w-1/2" />
+                              <Skeleton className="h-8 w-8 rounded-full" />
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-4 w-full mt-4" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-2/3" />
+                        </CardContent>
+                      </Card>
+                  )}
+                  {!isLoading && lessonPlan && (
+                      <div ref={lessonPlanRef}>
+                        <Card className="w-full bg-secondary/50 max-h-[calc(100vh-8rem)] overflow-y-auto">
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
+                                    <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleExportToPdf}
+                                    disabled={isPdfLoading}
+                                    aria-label="Export to PDF"
+                                    >
+                                    {isPdfLoading ? <LoadingSpinner className="h-5 w-5"/> : <Download className="h-5 w-5" />}
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="prose prose-sm max-w-none dark:prose-invert">
+                                    <ReactMarkdown>{lessonPlan}</ReactMarkdown>
+                                </div>
+                            </CardContent>
+                        </Card>
+                      </div>
+                  )}
+                  {!isLoading && !lessonPlan && (
+                      <Card className="flex items-center justify-center h-96 border-dashed bg-secondary/20">
+                          <CardContent className="text-center text-muted-foreground p-6">
+                              <BookText className="mx-auto h-12 w-12" />
+                              <p className="mt-4 font-medium">Your generated lesson plan will appear here.</p>
+                              <p className="text-sm">Fill out the form to the left to get started.</p>
+                          </CardContent>
+                      </Card>
+                  )}
+              </div>
+            </div>
         </div>
       </div>
     </div>
