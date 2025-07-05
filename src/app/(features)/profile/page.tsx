@@ -61,10 +61,14 @@ export default function ProfilePage() {
             setIsEditing(false);
         } catch (error: any) {
             console.error("Error updating profile:", error);
+            let description = 'An unknown error occurred while updating your profile.';
+            if (error.code === 'permission-denied') {
+              description = "You don't have permission to update your profile. Please check your Firestore security rules to ensure a teacher can write to their own document in the 'teachers' collection.";
+            }
             toast({ 
                 variant: 'destructive', 
                 title: 'Update Failed', 
-                description: error.message || 'An unknown error occurred. This is often due to Firestore security rules.',
+                description: description,
                 duration: 9000,
             });
         } finally {
