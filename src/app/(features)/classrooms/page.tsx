@@ -107,7 +107,7 @@ export default function ClassroomsPage() {
           <SidebarTrigger />
         </header>
         <div className="flex-1 p-4 md:p-8 overflow-auto">
-          <Card className="max-w-4xl mx-auto flex flex-col h-full">
+          <Card className="flex flex-col h-full">
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Your Classroom</CardTitle>
               <CardDescription>View messages and updates from your teachers.</CardDescription>
