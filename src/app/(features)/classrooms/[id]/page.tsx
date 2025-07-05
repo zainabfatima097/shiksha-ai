@@ -4,14 +4,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, addDoc, serverTimestamp, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, addDoc, serverTimestamp, orderBy, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Users, ArrowRight, BookOpenCheck } from 'lucide-react';
+import { Send, Users, ArrowRight, BookOpenCheck, Trash2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,17 @@ import * as z from 'zod';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -145,6 +156,26 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
       toast({ variant: 'destructive', title: 'Error', description: 'Could not post message.' });
     }
   };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!db || !user) return;
+
+    try {
+      const postRef = doc(db, 'classrooms', params.id, 'posts', postId);
+      await deleteDoc(postRef);
+      toast({
+        title: 'Success',
+        description: 'The post has been deleted.',
+      });
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not delete the post. Please try again.',
+      });
+    }
+  };
   
   if (authLoading || loading) {
     return <div className="flex items-center justify-center h-full"><LoadingSpinner className="h-12 w-12" /></div>;
@@ -185,7 +216,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
                     <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
                     <div className="space-y-6">
                         {posts.map(post => (
-                        <div key={post.id} className="flex items-start gap-4">
+                        <div key={post.id} className="group relative flex items-start gap-4">
                             <Avatar>
                                 <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
                             </Avatar>
@@ -220,6 +251,34 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
                                     <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
                                 )}
                             </div>
+                            {profile?.role === 'teacher' && user?.uid === post.authorId && (
+                                <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the post.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    className="bg-destructive hover:bg-destructive/90"
+                                                    onClick={() => handleDeletePost(post.id)}
+                                                >
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            )}
                         </div>
                         ))}
                         {posts.length === 0 && (
