@@ -22,8 +22,6 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/components/ui/carousel";
 import { Download, BookText } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
@@ -255,7 +253,7 @@ export default function LessonPlannerPage() {
                     <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
                     </div>
                 ) : history.length > 0 ? (
-                <Carousel opts={{ align: "start", loop: false }} className="w-full sm:px-8">
+                <Carousel opts={{ align: "start", loop: false }} className="w-full">
                     <CarouselContent className="-ml-2">
                     {history.map((item, index) => (
                         <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
@@ -273,8 +271,6 @@ export default function LessonPlannerPage() {
                         </CarouselItem>
                     ))}
                     </CarouselContent>
-                    <CarouselPrevious className="hidden sm:flex" />
-                    <CarouselNext className="hidden sm:flex" />
                 </Carousel>
                 ) : (
                     <Card className="bg-secondary/50 border-dashed">
