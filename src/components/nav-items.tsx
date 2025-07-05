@@ -54,7 +54,7 @@ export function NavItems() {
   return (
     <div className="flex flex-col h-full justify-between">
       <SidebarMenu>
-        {isDevMode && profile?.role === 'teacher' && (
+        {isDevMode && (
             <SidebarMenuItem>
                 <SidebarMenuButton
                 asChild

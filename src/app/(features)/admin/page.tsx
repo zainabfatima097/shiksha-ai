@@ -39,7 +39,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isDevMode || (profile && profile.role !== 'teacher')) {
-      router.replace('/lesson-planner');
+      router.replace('/profile');
     }
   }, [isDevMode, router, profile]);
 
