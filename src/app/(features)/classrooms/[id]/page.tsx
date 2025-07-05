@@ -154,8 +154,8 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className={`transition-all duration-300 ${showMembers ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
+        <div className="h-full max-w-7xl mx-auto flex gap-8">
+          <div className="flex-1 min-w-0">
             <Card className="flex flex-col h-full">
                 <CardHeader>
                     <div className="flex justify-between items-center">
@@ -163,7 +163,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
                         <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
                         <CardDescription>Updates and messages from your teachers.</CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="hidden lg:inline-flex">
+                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="hidden lg:inline-flex shrink-0">
                             <Users className="mr-2 h-4 w-4"/>
                             {showMembers ? 'Hide Members' : 'View Members'}
                         </Button>
@@ -205,7 +205,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
             </Card>
           </div>
           {showMembers && (
-            <div className="hidden lg:block lg:col-span-1">
+            <div className="hidden lg:block w-80 shrink-0">
                 <Card className="h-full">
                     <CardHeader>
                         <CardTitle>Members</CardTitle>
