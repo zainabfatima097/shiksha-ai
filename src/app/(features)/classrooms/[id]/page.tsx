@@ -11,11 +11,12 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send } from 'lucide-react';
+import { Send, Users } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -29,11 +30,21 @@ interface Post {
   createdAt: any; // Firestore timestamp
 }
 
+// Minimal profile types for members list
+interface Member {
+    uid: string;
+    name: string;
+    rollNumber?: string;
+}
+
 export default function ClassroomDetailPage({ params }: { params: { id: string } }) {
   const { user, profile, loading: authLoading } = useAuth();
   const [classroom, setClassroom] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [teachers, setTeachers] = useState<Member[]>([]);
+  const [students, setStudents] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showMembers, setShowMembers] = useState(false);
   const { toast } = useToast();
   const feedRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +66,22 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
       }
       const classroomData = classroomSnap.data();
       setClassroom(classroomData);
+
+      // Fetch members
+      if (classroomData) {
+        setTeachers([]);
+        setStudents([]);
+        if (classroomData.teacherIds && classroomData.teacherIds.length > 0) {
+            const teacherPromises = classroomData.teacherIds.map((id: string) => getDoc(doc(db, 'teachers', id)));
+            const teacherDocs = await Promise.all(teacherPromises);
+            setTeachers(teacherDocs.filter(d => d.exists()).map(d => d.data() as Member));
+        }
+        if (classroomData.studentIds && classroomData.studentIds.length > 0) {
+            const studentPromises = classroomData.studentIds.map((id: string) => getDoc(doc(db, 'students', id)));
+            const studentDocs = await Promise.all(studentPromises);
+            setStudents(studentDocs.filter(d => d.exists()).map(d => d.data() as Member));
+        }
+      }
 
     } catch (error: any) {
       console.error("Error fetching classroom data:", error);
@@ -90,7 +117,9 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
   }, [params.id, toast]);
 
   useEffect(() => {
-    feedRef.current?.scrollTo(0, feedRef.current.scrollHeight);
+    if (feedRef.current) {
+        feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
   }, [posts]);
 
   const handlePostMessage = async (values: { message: string }) => {
@@ -125,46 +154,97 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
         <SidebarTrigger />
       </header>
       <div className="flex-1 p-4 md:p-8 overflow-hidden">
-        <div className="h-full max-w-4xl mx-auto flex flex-col">
-          <Card className="flex-1 flex flex-col">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
-              <CardDescription>Updates and messages from your teachers.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
-              <div className="space-y-6">
-                {posts.map(post => (
-                  <div key={post.id} className="flex items-start gap-4">
-                    <Avatar>
-                      <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                         <p className="font-semibold">{post.authorName}</p>
-                         <p className="text-xs text-muted-foreground">
-                              {post.createdAt ? new Date(post.createdAt?.toDate()).toLocaleString() : 'sending...'}
-                         </p>
-                      </div>
-                      <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
+        <div className="h-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className={`transition-all duration-300 ${showMembers ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
+            <Card className="flex flex-col h-full">
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                        <CardTitle className="font-headline text-2xl">Classroom Feed</CardTitle>
+                        <CardDescription>Updates and messages from your teachers.</CardDescription>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => setShowMembers(!showMembers)} className="hidden lg:inline-flex">
+                            <Users className="mr-2 h-4 w-4"/>
+                            {showMembers ? 'Hide Members' : 'View Members'}
+                        </Button>
                     </div>
-                  </div>
-                ))}
-                {posts.length === 0 && (
-                    <div className="text-center py-10 text-muted-foreground">No posts in this classroom yet.</div>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-y-auto pr-4" ref={feedRef}>
+                <div className="space-y-6">
+                    {posts.map(post => (
+                    <div key={post.id} className="flex items-start gap-4">
+                        <Avatar>
+                        <AvatarFallback>{post.authorName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                            <p className="font-semibold">{post.authorName}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {post.createdAt ? new Date(post.createdAt?.toDate()).toLocaleString() : 'sending...'}
+                            </p>
+                        </div>
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
+                        </div>
+                    </div>
+                    ))}
+                    {posts.length === 0 && (
+                        <div className="text-center py-10 text-muted-foreground">No posts in this classroom yet.</div>
+                    )}
+                </div>
+                </CardContent>
+                {profile?.role === 'teacher' && (
+                <CardFooter className="pt-4 border-t">
+                    <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
+                        <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
+                        <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
+                        <Send className="h-4 w-4"/>
+                        </Button>
+                    </form>
+                </CardFooter>
                 )}
-              </div>
-            </CardContent>
-            {profile?.role === 'teacher' && (
-              <CardFooter className="pt-4 border-t">
-                <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
-                    <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
-                    <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
-                      <Send className="h-4 w-4"/>
-                    </Button>
-                </form>
-              </CardFooter>
-            )}
-          </Card>
+            </Card>
+          </div>
+          {showMembers && (
+            <div className="hidden lg:block lg:col-span-1">
+                <Card className="h-full">
+                    <CardHeader>
+                        <CardTitle>Members</CardTitle>
+                        <CardDescription>{teachers.length} Teacher(s), {students.length} Student(s)</CardDescription>
+                    </CardHeader>
+                    <CardContent className="overflow-y-auto" style={{maxHeight: "calc(100vh - 200px)"}}>
+                        <Accordion type="single" collapsible defaultValue="teachers" className="w-full">
+                            <AccordionItem value="teachers">
+                                <AccordionTrigger>Teachers</AccordionTrigger>
+                                <AccordionContent>
+                                    <ul className="space-y-3 pt-2">
+                                    {teachers.length > 0 ? teachers.map(teacher => (
+                                        <li key={teacher.uid} className="flex items-center gap-2 text-sm">
+                                            <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{teacher.name.charAt(0)}</AvatarFallback></Avatar>
+                                            {teacher.name}
+                                        </li>
+                                    )) : <li className="text-sm text-muted-foreground">No teachers found.</li>}
+                                    </ul>
+                                </AccordionContent>
+                            </AccordionItem>
+                             <AccordionItem value="students">
+                                <AccordionTrigger>Students</AccordionTrigger>
+                                <AccordionContent>
+                                     <ul className="space-y-3 pt-2">
+                                    {students.length > 0 ? students.sort((a, b) => (parseInt(a.rollNumber || '0') - parseInt(b.rollNumber || '0'))).map(student => (
+                                        <li key={student.uid} className="flex items-center gap-2 text-sm">
+                                            <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{student.name.charAt(0)}</AvatarFallback></Avatar>
+                                            <span className="flex-1 truncate">{student.name}</span>
+                                            <span className="text-muted-foreground">#{student.rollNumber}</span>
+                                        </li>
+                                    )) : <li className="text-sm text-muted-foreground">No students found.</li>}
+                                    </ul>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
+                    </CardContent>
+                </Card>
+            </div>
+          )}
         </div>
       </div>
     </div>
