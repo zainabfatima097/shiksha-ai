@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useParams } from 'next/navigation';
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -54,7 +55,10 @@ interface Member {
     rollNumber?: string;
 }
 
-export default function ClassroomDetailPage({ params }: { params: { id: string } }) {
+export default function ClassroomDetailPage() {
+  const params = useParams<{ id: string }>();
+  const classroomId = params.id;
+
   const { user, profile, loading: authLoading } = useAuth();
   const [classroom, setClassroom] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -71,10 +75,10 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
   });
 
   const fetchClassroomData = useCallback(async () => {
-    if (!db || !user) return;
+    if (!db || !user || !classroomId) return;
     setLoading(true);
     try {
-      const classroomRef = doc(db, 'classrooms', params.id);
+      const classroomRef = doc(db, 'classrooms', classroomId);
       const classroomSnap = await getDoc(classroomRef);
 
       if (!classroomSnap.exists()) {
@@ -110,7 +114,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
     } finally {
       setLoading(false);
     }
-  }, [params.id, toast, user]);
+  }, [classroomId, toast, user]);
 
   useEffect(() => {
       if(!authLoading && user){
@@ -119,8 +123,8 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
   }, [authLoading, user, fetchClassroomData]);
   
   useEffect(() => {
-    if(!db) return;
-    const postsQuery = query(collection(db, 'classrooms', params.id, 'posts'), orderBy('createdAt', 'asc'));
+    if(!db || !classroomId) return;
+    const postsQuery = query(collection(db, 'classrooms', classroomId, 'posts'), orderBy('createdAt', 'asc'));
     
     const unsubscribe = onSnapshot(postsQuery, (querySnapshot) => {
       const postsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
@@ -131,7 +135,7 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
     });
 
     return () => unsubscribe();
-  }, [params.id, toast]);
+  }, [classroomId, toast]);
 
   useEffect(() => {
     if (feedRef.current) {
@@ -140,10 +144,10 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
   }, [posts]);
 
   const handlePostMessage = async (values: { message: string }) => {
-    if (!user || !profile || profile.role !== 'teacher' || !db) return;
+    if (!user || !profile || profile.role !== 'teacher' || !db || !classroomId) return;
 
     try {
-      await addDoc(collection(db, 'classrooms', params.id, 'posts'), {
+      await addDoc(collection(db, 'classrooms', classroomId, 'posts'), {
         authorId: user.uid,
         authorName: profile.name,
         content: values.message,
@@ -158,10 +162,10 @@ export default function ClassroomDetailPage({ params }: { params: { id: string }
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!db || !user) return;
+    if (!db || !user || !classroomId) return;
 
     try {
-      const postRef = doc(db, 'classrooms', params.id, 'posts', postId);
+      const postRef = doc(db, 'classrooms', classroomId, 'posts', postId);
       await deleteDoc(postRef);
       toast({
         title: 'Success',
