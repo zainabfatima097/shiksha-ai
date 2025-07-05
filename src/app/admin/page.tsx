@@ -208,14 +208,15 @@ export default function AdminPage() {
       
       updateLog(`Highest existing teacher number is ${lastTeacherNumber}. Starting new teachers from ${lastTeacherNumber + 1}.`);
       
-      for (let i = 0; i < values.count; i++) {
-        const teacherNumber = lastTeacherNumber + i + 1;
+      let teacherNumber = lastTeacherNumber;
+      while (createdCount < values.count) {
+        teacherNumber++;
         const email = `teacher${teacherNumber}@example.com`;
         const password = `teacher${teacherNumber}`;
         const name = `Teacher ${teacherNumber}`;
 
         try {
-          updateLog(`[${i + 1}/${values.count}] Creating teacher: ${email}...`);
+          updateLog(`[${createdCount + 1}/${values.count}] Attempting to create teacher: ${email}...`);
           
           const tempAppName = `teacher-creator-${Date.now()}-${teacherNumber}`;
           const tempApp = initializeApp(firebaseConfig, tempAppName);
@@ -238,10 +239,15 @@ export default function AdminPage() {
           updateLog(`- Successfully created ${email}.`);
           createdCount++;
         } catch (error: any) {
-          handleGenerationError(error, i + 1, email);
+          if (error.code === 'auth/email-already-in-use') {
+            updateLog(`- SKIPPED: ${email} already exists.`);
+            continue; // Skip to the next number
+          }
+          // For any other error, stop the generation process.
+          handleGenerationError(error, createdCount + 1, email);
           return;
         } finally {
-          setProgress(((i + 1) / values.count) * 100);
+          setProgress(((createdCount) / values.count) * 100);
         }
       }
       endGeneration(createdCount, values.count, 'teacher');
