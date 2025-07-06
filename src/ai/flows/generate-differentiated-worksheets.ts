@@ -19,6 +19,10 @@ const GenerateDifferentiatedWorksheetsInputSchema = z.object({
   gradeLevels: z
     .string()
     .describe('Comma-separated list of grade levels (e.g., 3,4,5).'),
+  additionalDetails: z
+    .string()
+    .optional()
+    .describe('Additional instructions from the teacher to tailor the worksheet.'),
 });
 export type GenerateDifferentiatedWorksheetsInput = z.infer<
   typeof GenerateDifferentiatedWorksheetsInputSchema
@@ -56,6 +60,9 @@ Consider the Indian context while generating content. For example, if the conten
 
 Textbook Page Image: {{media url=textbookPageImage}}
 Grade Levels: {{{gradeLevels}}}
+{{#if additionalDetails}}
+Additional Details from the teacher: {{{additionalDetails}}}
+{{/if}}
 
 Output a JSON array of worksheets, one for each grade level.
 `,

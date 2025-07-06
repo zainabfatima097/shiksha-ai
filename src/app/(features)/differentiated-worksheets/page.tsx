@@ -25,11 +25,13 @@ import { useRouter } from 'next/navigation';
 import { Download, Share2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { Textarea } from '@/components/ui/textarea';
 
 
 const worksheetsSchema = z.object({
   textbookPageImage: z.string().min(1, 'Please upload an image.'),
   gradeLevels: z.string().min(1, 'Please enter grade levels.').regex(/^\d+(,\s*\d+)*$/, 'Please enter comma-separated numbers (e.g., 3, 4, 5)'),
+  additionalDetails: z.string().optional(),
 });
 
 type Worksheet = GenerateDifferentiatedWorksheetsOutput['worksheets'][0];
@@ -66,6 +68,7 @@ export default function DifferentiatedWorksheetsPage() {
     defaultValues: {
       textbookPageImage: '',
       gradeLevels: '',
+      additionalDetails: '',
     },
   });
 
@@ -231,6 +234,22 @@ export default function DifferentiatedWorksheetsPage() {
                     <FormMessage />
                   </FormItem>
               )}/>
+              <FormField
+                control={form.control}
+                name="additionalDetails"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Additional Details (Optional)</FormLabel>
+                        <FormControl>
+                            <Textarea
+                                placeholder="e.g., Create mostly fill-in-the-blank questions based on the text."
+                                {...field}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+              />
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
                 Generate Worksheets
