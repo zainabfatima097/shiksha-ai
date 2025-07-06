@@ -31,6 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useParams } from 'next/navigation';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const postSchema = z.object({
   message: z.string().min(1, 'Message cannot be empty.'),
@@ -65,6 +66,7 @@ export default function ClassroomDetailPage() {
   const [teachers, setTeachers] = useState<Member[]>([]);
   const [students, setStudents] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [membersLoading, setMembersLoading] = useState(true);
   const [showMembers, setShowMembers] = useState(false);
   const { toast } = useToast();
   const feedRef = useRef<HTMLDivElement>(null);
@@ -83,27 +85,10 @@ export default function ClassroomDetailPage() {
 
       if (!classroomSnap.exists()) {
         toast({ variant: 'destructive', title: 'Error', description: 'Classroom not found.' });
-        return;
+        setClassroom(null);
+      } else {
+        setClassroom(classroomSnap.data());
       }
-      const classroomData = classroomSnap.data();
-      setClassroom(classroomData);
-
-      // Fetch members
-      if (classroomData) {
-        setTeachers([]);
-        setStudents([]);
-        if (classroomData.teacherIds && classroomData.teacherIds.length > 0) {
-            const teacherPromises = classroomData.teacherIds.map((id: string) => getDoc(doc(db, 'teachers', id)));
-            const teacherDocs = await Promise.all(teacherPromises);
-            setTeachers(teacherDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
-        }
-        if (classroomData.studentIds && classroomData.studentIds.length > 0) {
-            const studentPromises = classroomData.studentIds.map((id: string) => getDoc(doc(db, 'students', id)));
-            const studentDocs = await Promise.all(studentPromises);
-            setStudents(studentDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
-        }
-      }
-
     } catch (error: any) {
       console.error("Error fetching classroom data:", error);
       let description = 'Could not load classroom data.';
@@ -122,6 +107,37 @@ export default function ClassroomDetailPage() {
       }
   }, [authLoading, user, fetchClassroomData]);
   
+  // Fetch members after classroom data is loaded
+  useEffect(() => {
+    const fetchMembers = async () => {
+        if (!db || !classroom) return;
+        setMembersLoading(true);
+        
+        try {
+            // Fetch teachers in parallel with students
+            const teacherPromises = (classroom.teacherIds || []).map((id: string) => getDoc(doc(db, 'teachers', id)));
+            const studentPromises = (classroom.studentIds || []).map((id: string) => getDoc(doc(db, 'students', id)));
+
+            const [teacherDocs, studentDocs] = await Promise.all([
+                Promise.all(teacherPromises),
+                Promise.all(studentPromises)
+            ]);
+
+            setTeachers(teacherDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
+            setStudents(studentDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
+            
+        } catch (error) {
+             console.error("Error fetching members:", error);
+             toast({ variant: 'destructive', title: 'Error', description: 'Could not load classroom members list.' });
+        } finally {
+            setMembersLoading(false);
+        }
+    };
+    
+    fetchMembers();
+  }, [classroom, db, toast]);
+
+
   useEffect(() => {
     if(!db || !classroomId) return;
     const postsQuery = query(collection(db, 'classrooms', classroomId, 'posts'), orderBy('createdAt', 'asc'));
@@ -316,38 +332,69 @@ export default function ClassroomDetailPage() {
                     <Card className="h-full w-80 shrink-0">
                         <CardHeader>
                             <CardTitle>Members</CardTitle>
-                            <CardDescription>{teachers.length} Teacher(s), {students.length} Student(s)</CardDescription>
+                            {!membersLoading && <CardDescription>{teachers.length} Teacher(s), {students.length} Student(s)</CardDescription>}
                         </CardHeader>
                         <CardContent className="overflow-y-auto" style={{maxHeight: "calc(100vh - 200px)"}}>
-                            <Accordion type="single" collapsible defaultValue="teachers" className="w-full">
-                                <AccordionItem value="teachers">
-                                    <AccordionTrigger>Teachers</AccordionTrigger>
-                                    <AccordionContent>
-                                        <ul className="space-y-3 pt-2">
-                                        {teachers.length > 0 ? teachers.map(teacher => (
-                                            <li key={teacher.uid} className="flex items-center gap-2 text-sm">
-                                                <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{teacher.name.charAt(0)}</AvatarFallback></Avatar>
-                                                {teacher.name}
-                                            </li>
-                                        )) : <li className="text-sm text-muted-foreground">No teachers found.</li>}
-                                        </ul>
-                                    </AccordionContent>
-                                </AccordionItem>
-                                <AccordionItem value="students">
-                                    <AccordionTrigger>Students</AccordionTrigger>
-                                    <AccordionContent>
-                                        <ul className="space-y-3 pt-2">
-                                        {students.length > 0 ? students.sort((a, b) => (parseInt(a.rollNumber || '0') - parseInt(b.rollNumber || '0'))).map(student => (
-                                            <li key={student.uid} className="flex items-center gap-2 text-sm">
-                                                <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{student.name.charAt(0)}</AvatarFallback></Avatar>
-                                                <span className="flex-1 truncate">{student.name}</span>
-                                                <span className="text-muted-foreground">#{student.rollNumber}</span>
-                                            </li>
-                                        )) : <li className="text-sm text-muted-foreground">No students found.</li>}
-                                        </ul>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            </Accordion>
+                             {membersLoading ? (
+                                <div className="space-y-4 p-4">
+                                    <Skeleton className="h-8 w-full" />
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-6 w-6 rounded-full" />
+                                            <Skeleton className="h-4 w-3/4" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-6 w-6 rounded-full" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                    </div>
+                                    <Skeleton className="h-8 w-full mt-4" />
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-6 w-6 rounded-full" />
+                                            <Skeleton className="h-4 w-3/4" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-6 w-6 rounded-full" />
+                                            <Skeleton className="h-4 w-4/5" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-6 w-6 rounded-full" />
+                                            <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <Accordion type="single" collapsible defaultValue="teachers" className="w-full">
+                                    <AccordionItem value="teachers">
+                                        <AccordionTrigger>Teachers</AccordionTrigger>
+                                        <AccordionContent>
+                                            <ul className="space-y-3 pt-2">
+                                            {teachers.length > 0 ? teachers.map(teacher => (
+                                                <li key={teacher.uid} className="flex items-center gap-2 text-sm">
+                                                    <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{teacher.name.charAt(0)}</AvatarFallback></Avatar>
+                                                    {teacher.name}
+                                                </li>
+                                            )) : <li className="text-sm text-muted-foreground">No teachers found.</li>}
+                                            </ul>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                    <AccordionItem value="students">
+                                        <AccordionTrigger>Students</AccordionTrigger>
+                                        <AccordionContent>
+                                            <ul className="space-y-3 pt-2">
+                                            {students.length > 0 ? students.sort((a, b) => (parseInt(a.rollNumber || '0') - parseInt(b.rollNumber || '0'))).map(student => (
+                                                <li key={student.uid} className="flex items-center gap-2 text-sm">
+                                                    <Avatar className="h-6 w-6 text-xs"><AvatarFallback>{student.name.charAt(0)}</AvatarFallback></Avatar>
+                                                    <span className="flex-1 truncate">{student.name}</span>
+                                                    <span className="text-muted-foreground">#{student.rollNumber}</span>
+                                                </li>
+                                            )) : <li className="text-sm text-muted-foreground">No students found.</li>}
+                                            </ul>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+                            )}
                         </CardContent>
                     </Card>
                 )}
