@@ -8,9 +8,9 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LoadingSpinner } from '@/components/loading-spinner';
 import { ArrowLeft, BookText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface LessonPlan {
     id: string;
@@ -21,6 +21,38 @@ interface LessonPlan {
     authorName: string;
     createdAt: any;
 }
+
+const LessonPlanSkeleton = () => (
+    <div className="flex-1 p-4 md:p-8 overflow-auto">
+        <div className="max-w-4xl mx-auto">
+            <Skeleton className="h-9 w-24 mb-4 -ml-4" />
+            <Card>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:gap-4">
+                        <Skeleton className="h-12 w-12 rounded-lg shrink-0" />
+                        <div className="flex-1 space-y-2 mt-1 w-full">
+                            <Skeleton className="h-8 w-3/4" />
+                            <Skeleton className="h-5 w-1/2" />
+                            <Skeleton className="h-4 w-1/3" />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <div className="pt-4 space-y-4">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+);
+
 
 export default function LessonPlanViewerPage() {
     const params = useParams();
@@ -60,11 +92,7 @@ export default function LessonPlanViewerPage() {
     }, [params.id, user, authLoading]);
 
     if (authLoading || loading) {
-        return (
-            <div className="flex items-center justify-center h-full">
-                <LoadingSpinner className="h-12 w-12" />
-            </div>
-        );
+        return <LessonPlanSkeleton />;
     }
     
     if (!lessonPlan) {
