@@ -107,22 +107,22 @@ export default function ClassroomsPage() {
           <SidebarTrigger />
         </header>
         <div className="flex-1 p-4 md:p-8 overflow-auto">
-          <Card className="flex flex-col h-full">
+          <Card>
             <CardHeader>
               <CardTitle className="font-headline text-2xl">Your Classroom</CardTitle>
               <CardDescription>View messages and updates from your teachers.</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex items-center justify-center">
+            <CardContent>
               {studentClassroom ? (
-                <Link href={`/classrooms/${studentClassroom.id}`} passHref className="w-full max-w-lg">
-                  <Card className="hover:bg-accent cursor-pointer transition-colors">
+                <Link href={`/classrooms/${studentClassroom.id}`} passHref className="block w-full">
+                  <Card className="transition-colors cursor-pointer hover:bg-accent">
                     <CardHeader className="p-8">
-                      <div className="flex justify-between items-center">
+                      <div className="flex items-center justify-between">
                         <div>
                           <CardTitle>Grade {studentClassroom.grade} - Section {studentClassroom.section}</CardTitle>
                           <CardDescription className="mt-1">Click to enter</CardDescription>
                         </div>
-                        <ArrowRight className="h-6 w-6 text-muted-foreground"/>
+                        <ArrowRight className="w-6 h-6 text-muted-foreground"/>
                       </div>
                     </CardHeader>
                   </Card>
