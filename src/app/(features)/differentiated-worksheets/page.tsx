@@ -248,22 +248,36 @@ export default function DifferentiatedWorksheetsPage() {
                     <Accordion type="single" collapsible className="w-full">
                       {worksheets.map((ws, index) => (
                         <AccordionItem value={`item-${index}`} key={index}>
-                          <AccordionTrigger>Grade Level: {ws.gradeLevel}</AccordionTrigger>
+                          <div className="flex items-center w-full">
+                            <AccordionTrigger className="flex-1">Grade Level: {ws.gradeLevel}</AccordionTrigger>
+                            <div className="flex items-center gap-2 pr-4">
+                               <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); handleExportToPdf(index); }} 
+                                  disabled={isPdfLoading !== null}
+                                  aria-label={`Download PDF for Grade ${ws.gradeLevel}`}
+                                >
+                                    {isPdfLoading === ws.gradeLevel ? <LoadingSpinner className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}
+                                    PDF
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); setSelectedWorksheet(ws); setIsShareDialogOpen(true); }} 
+                                  disabled={classrooms.length === 0}
+                                  aria-label={`Share worksheet for Grade ${ws.gradeLevel}`}
+                                >
+                                    <Share2 className="mr-2 h-4 w-4" />
+                                    Share
+                                </Button>
+                            </div>
+                          </div>
                           <AccordionContent>
                             <div ref={el => contentRefs.current[index] = el} className="p-4 bg-background rounded-md border">
                                 <div className="prose prose-sm max-w-none dark:prose-invert">
                                     <ReactMarkdown>{ws.worksheetContent}</ReactMarkdown>
                                 </div>
-                            </div>
-                            <div className="flex items-center gap-2 mt-4">
-                               <Button variant="outline" size="sm" onClick={() => handleExportToPdf(index)} disabled={isPdfLoading !== null}>
-                                    {isPdfLoading === ws.gradeLevel ? <LoadingSpinner className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}
-                                    PDF
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={() => { setSelectedWorksheet(ws); setIsShareDialogOpen(true); }} disabled={classrooms.length === 0}>
-                                    <Share2 className="mr-2 h-4 w-4" />
-                                    Share
-                                </Button>
                             </div>
                           </AccordionContent>
                         </AccordionItem>
@@ -307,5 +321,3 @@ export default function DifferentiatedWorksheetsPage() {
     </div>
   );
 }
-
-    
