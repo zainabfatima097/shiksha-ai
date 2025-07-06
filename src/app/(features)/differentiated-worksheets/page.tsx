@@ -1,15 +1,20 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { generateDifferentiatedWorksheets, GenerateDifferentiatedWorksheetsOutput } from '@/ai/flows/generate-differentiated-worksheets';
 import { LoadingSpinner } from '@/components/loading-spinner';
@@ -17,6 +22,9 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { useRouter } from 'next/navigation';
+import { Download, Share2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
 
 const worksheetsSchema = z.object({
@@ -24,21 +32,34 @@ const worksheetsSchema = z.object({
   gradeLevels: z.string().min(1, 'Please enter grade levels.').regex(/^\d+(,\s*\d+)*$/, 'Please enter comma-separated numbers (e.g., 3, 4, 5)'),
 });
 
+type Worksheet = GenerateDifferentiatedWorksheetsOutput['worksheets'][0];
+
+interface Classroom {
+  id: string;
+  grade: string;
+  section: string;
+}
+
 export default function DifferentiatedWorksheetsPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [worksheets, setWorksheets] = useState<GenerateDifferentiatedWorksheetsOutput['worksheets']>([]);
+  const [isPdfLoading, setIsPdfLoading] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [selectedWorksheet, setSelectedWorksheet] = useState<Worksheet | null>(null);
+  const [selectedClassroom, setSelectedClassroom] = useState('');
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const { toast } = useToast();
-  const { profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const router = useRouter();
-
+  const contentRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     if (!authLoading && profile && profile.role !== 'teacher') {
         router.replace('/profile');
     }
   }, [authLoading, profile, router]);
-
 
   const form = useForm<z.infer<typeof worksheetsSchema>>({
     resolver: zodResolver(worksheetsSchema),
@@ -47,6 +68,35 @@ export default function DifferentiatedWorksheetsPage() {
       gradeLevels: '',
     },
   });
+
+  const fetchClassrooms = useCallback(async (uid: string) => {
+    if (!db) return;
+    try {
+      const teacherRef = doc(db, 'teachers', uid);
+      const teacherSnap = await getDoc(teacherRef);
+      if (teacherSnap.exists()) {
+        const teacherData = teacherSnap.data();
+        if (teacherData.classroomIds && teacherData.classroomIds.length > 0) {
+          const classroomPromises = teacherData.classroomIds.map((id: string) => getDoc(doc(db, 'classrooms', id)));
+          const classroomDocs = await Promise.all(classroomPromises);
+          const classroomsData = classroomDocs
+            .filter(d => d.exists())
+            .map(d => ({ id: d.id, ...d.data() } as Classroom));
+          setClassrooms(classroomsData);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching classrooms:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not load your classrooms for sharing.' });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (user && profile?.role === 'teacher') {
+      fetchClassrooms(user.uid);
+    }
+  }, [user, profile, fetchClassrooms]);
+
 
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -67,9 +117,11 @@ export default function DifferentiatedWorksheetsPage() {
   async function onSubmit(values: z.infer<typeof worksheetsSchema>) {
     setIsLoading(true);
     setWorksheets([]);
+    contentRefs.current = [];
     try {
       const result = await generateDifferentiatedWorksheets(values);
       setWorksheets(result.worksheets);
+      contentRefs.current = result.worksheets.map(() => null);
     } catch (error) {
       console.error('Error generating worksheets:', error);
       toast({
@@ -81,13 +133,72 @@ export default function DifferentiatedWorksheetsPage() {
       setIsLoading(false);
     }
   }
+  
+  const handleExportToPdf = (index: number) => {
+    const input = contentRefs.current[index];
+    const gradeLevel = worksheets[index].gradeLevel;
+    if (!input) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not find the worksheet content to export.' });
+      return;
+    }
+    setIsPdfLoading(gradeLevel);
+    html2canvas(input, { scale: 2, useCORS: true })
+      .then((canvas) => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+        pdf.addImage(imgData, 'PNG', 0, 0, imgProps.width * ratio, imgProps.height * ratio);
+        pdf.save(`worksheet-grade-${gradeLevel}.pdf`);
+      })
+      .catch((error) => {
+        console.error('Error generating PDF:', error);
+        toast({ variant: 'destructive', title: 'PDF Error', description: 'Failed to export as PDF.' });
+      })
+      .finally(() => setIsPdfLoading(null));
+  };
+  
+  const handleShare = async () => {
+    if (!user || !profile || !selectedClassroom || !selectedWorksheet) return;
+
+    setIsSharing(true);
+    try {
+      const worksheetData = {
+        authorId: user.uid,
+        authorName: profile.name,
+        createdAt: serverTimestamp(),
+        gradeLevel: selectedWorksheet.gradeLevel,
+        worksheetContent: selectedWorksheet.worksheetContent,
+      };
+      const worksheetRef = await addDoc(collection(db, 'worksheets'), worksheetData);
+
+      const postData = {
+        authorId: user.uid,
+        authorName: profile.name,
+        createdAt: serverTimestamp(),
+        type: 'worksheet',
+        worksheetId: worksheetRef.id,
+        gradeLevel: selectedWorksheet.gradeLevel,
+      };
+      await addDoc(collection(db, 'classrooms', selectedClassroom, 'posts'), postData);
+      
+      const classroom = classrooms.find(c => c.id === selectedClassroom);
+      toast({ title: 'Success', description: `Worksheet shared with Grade ${classroom?.grade} - Section ${classroom?.section}.` });
+      setIsShareDialogOpen(false);
+      setSelectedWorksheet(null);
+      setSelectedClassroom('');
+    } catch (error) {
+      console.error("Error sharing worksheet:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not share the worksheet.' });
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   if (authLoading || !profile || profile.role !== 'teacher') {
-    return (
-        <div className="flex items-center justify-center h-full">
-            <LoadingSpinner className="h-12 w-12" />
-        </div>
-    );
+    return <div className="flex items-center justify-center h-full"><LoadingSpinner className="h-12 w-12" /></div>;
   }
 
   return (
@@ -105,33 +216,21 @@ export default function DifferentiatedWorksheetsPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="textbookPageImage"
-                render={() => (
+              <FormField control={form.control} name="textbookPageImage" render={() => (
                   <FormItem>
                     <FormLabel>Textbook Page Image</FormLabel>
-                    <FormControl>
-                      <Input type="file" accept="image/*" onChange={handleFileChange} />
-                    </FormControl>
+                    <FormControl><Input type="file" accept="image/*" onChange={handleFileChange} /></FormControl>
                     <FormMessage />
                     {preview && <Image src={preview} alt="Textbook page preview" width={200} height={200} className="mt-4 rounded-md object-contain" />}
                   </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="gradeLevels"
-                render={({ field }) => (
+              )}/>
+              <FormField control={form.control} name="gradeLevels" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Grade Levels</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 3, 4, 5" {...field} />
-                    </FormControl>
+                    <FormControl><Input placeholder="e.g., 3, 4, 5" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
-                )}
-              />
+              )}/>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? <LoadingSpinner className="mr-2 h-4 w-4" /> : null}
                 Generate Worksheets
@@ -151,7 +250,21 @@ export default function DifferentiatedWorksheetsPage() {
                         <AccordionItem value={`item-${index}`} key={index}>
                           <AccordionTrigger>Grade Level: {ws.gradeLevel}</AccordionTrigger>
                           <AccordionContent>
-                            <pre className="whitespace-pre-wrap font-body text-sm">{ws.worksheetContent}</pre>
+                            <div ref={el => contentRefs.current[index] = el} className="p-4 bg-background rounded-md border">
+                                <div className="prose prose-sm max-w-none dark:prose-invert">
+                                    <ReactMarkdown>{ws.worksheetContent}</ReactMarkdown>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 mt-4">
+                               <Button variant="outline" size="sm" onClick={() => handleExportToPdf(index)} disabled={isPdfLoading !== null}>
+                                    {isPdfLoading === ws.gradeLevel ? <LoadingSpinner className="mr-2 h-4 w-4" /> : <Download className="mr-2 h-4 w-4" />}
+                                    PDF
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => { setSelectedWorksheet(ws); setIsShareDialogOpen(true); }} disabled={classrooms.length === 0}>
+                                    <Share2 className="mr-2 h-4 w-4" />
+                                    Share
+                                </Button>
+                            </div>
                           </AccordionContent>
                         </AccordionItem>
                       ))}
@@ -161,7 +274,38 @@ export default function DifferentiatedWorksheetsPage() {
           </CardFooter>
         )}
       </Card>
+
+      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Share Worksheet</DialogTitle>
+                <DialogDescription>
+                    Select a classroom to post this worksheet to their feed.
+                    {classrooms.length === 0 && <span className="text-destructive block mt-2">You have not joined any classrooms.</span>}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <Select onValueChange={setSelectedClassroom} defaultValue={selectedClassroom}>
+                    <SelectTrigger><SelectValue placeholder="Select a classroom..." /></SelectTrigger>
+                    <SelectContent>
+                        {classrooms.map(c => (
+                            <SelectItem key={c.id} value={c.id}>Grade {c.grade} - Section {c.section}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleShare} disabled={!selectedClassroom || isSharing}>
+                    {isSharing && <LoadingSpinner className="mr-2 h-4 w-4" />}
+                    Share
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </div>
   );
 }
+
+    

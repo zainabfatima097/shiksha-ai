@@ -11,7 +11,7 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Users, ArrowRight, BookOpenCheck, Trash2 } from 'lucide-react';
+import { Send, Users, ArrowRight, BookOpenCheck, Trash2, Sheet } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -43,10 +43,12 @@ interface Post {
   authorName: string;
   content?: string;
   createdAt: any; // Firestore timestamp
-  type?: 'message' | 'lessonPlan';
+  type?: 'message' | 'lessonPlan' | 'worksheet';
   lessonPlanId?: string;
+  worksheetId?: string;
   topic?: string;
   subject?: string;
+  gradeLevel?: string;
 }
 
 // Minimal profile types for members list
@@ -57,8 +59,8 @@ interface Member {
 }
 
 export default function ClassroomDetailPage() {
-  const params = useParams<{ id: string }>();
-  const classroomId = params.id;
+  const params = useParams();
+  const classroomId = params.id as string;
 
   const { user, profile, loading: authLoading } = useAuth();
   const [classroom, setClassroom] = useState<any>(null);
@@ -134,7 +136,9 @@ export default function ClassroomDetailPage() {
         }
     };
     
-    fetchMembers();
+    if (classroom) {
+      fetchMembers();
+    }
   }, [classroom, db, toast]);
 
 
@@ -272,6 +276,26 @@ export default function ClassroomDetailPage() {
                                             </div>
                                         </CardContent>
                                     </Card>
+                                ) : post.type === 'worksheet' ? (
+                                    <Card className="mt-2 bg-background">
+                                      <CardContent className="p-4">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            <Sheet className="h-6 w-6 text-primary shrink-0" />
+                                            <div>
+                                              <p className="font-semibold text-sm">Worksheet Shared</p>
+                                              <p className="text-xs text-muted-foreground">For Grade {post.gradeLevel}</p>
+                                            </div>
+                                          </div>
+                                          <Link href={`/worksheets/${post.worksheetId}`} passHref>
+                                            <Button size="sm" variant="outline">
+                                              View
+                                              <ArrowRight className="ml-2 h-4 w-4" />
+                                            </Button>
+                                          </Link>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
                                 ) : (
                                     <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
                                 )}
@@ -404,3 +428,5 @@ export default function ClassroomDetailPage() {
     </div>
   );
 }
+
+    
