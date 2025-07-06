@@ -36,12 +36,6 @@ const worksheetsSchema = z.object({
 
 type Worksheet = GenerateDifferentiatedWorksheetsOutput['worksheets'][0];
 
-interface Classroom {
-  id: string;
-  grade: string;
-  section: string;
-}
-
 export default function DifferentiatedWorksheetsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState<string | null>(null);
@@ -49,11 +43,10 @@ export default function DifferentiatedWorksheetsPage() {
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [selectedWorksheet, setSelectedWorksheet] = useState<Worksheet | null>(null);
   const [selectedClassroom, setSelectedClassroom] = useState('');
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [worksheets, setWorksheets] = useState<Worksheet[]>([]);
   const [preview, setPreview] = useState<string | null>(null);
   const { toast } = useToast();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, classrooms } = useAuth();
   const router = useRouter();
   const contentRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -71,35 +64,6 @@ export default function DifferentiatedWorksheetsPage() {
       additionalDetails: '',
     },
   });
-
-  const fetchClassrooms = useCallback(async (uid: string) => {
-    if (!db) return;
-    try {
-      const teacherRef = doc(db, 'teachers', uid);
-      const teacherSnap = await getDoc(teacherRef);
-      if (teacherSnap.exists()) {
-        const teacherData = teacherSnap.data();
-        if (teacherData.classroomIds && teacherData.classroomIds.length > 0) {
-          const classroomPromises = teacherData.classroomIds.map((id: string) => getDoc(doc(db, 'classrooms', id)));
-          const classroomDocs = await Promise.all(classroomPromises);
-          const classroomsData = classroomDocs
-            .filter(d => d.exists())
-            .map(d => ({ id: d.id, ...d.data() } as Classroom));
-          setClassrooms(classroomsData);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching classrooms:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load your classrooms for sharing.' });
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    if (user && profile?.role === 'teacher') {
-      fetchClassrooms(user.uid);
-    }
-  }, [user, profile, fetchClassrooms]);
-
 
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();

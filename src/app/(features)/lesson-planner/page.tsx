@@ -43,12 +43,6 @@ const lessonPlannerSchema = z.object({
 
 type LessonPlannerFormValues = z.infer<typeof lessonPlannerSchema>;
 
-interface Classroom {
-  id: string;
-  grade: string;
-  section: string;
-}
-
 export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
@@ -58,13 +52,12 @@ export default function LessonPlannerPage() {
   const [editedLessonPlan, setEditedLessonPlan] = useState('');
   const [history, setHistory] = useState<LessonPlanHistoryItem[]>([]);
   const { toast } = useToast();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, classrooms } = useAuth();
   const lessonPlanRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   
   const [isSharing, setIsSharing] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [selectedClassroom, setSelectedClassroom] = useState('');
 
 
@@ -132,36 +125,13 @@ export default function LessonPlannerPage() {
     }
   }, [toast]);
 
-  const fetchClassrooms = useCallback(async (uid: string) => {
-    if (!db) return;
-    try {
-      const teacherRef = doc(db, 'teachers', uid);
-      const teacherSnap = await getDoc(teacherRef);
-      if (teacherSnap.exists()) {
-        const teacherData = teacherSnap.data();
-        if (teacherData.classroomIds && teacherData.classroomIds.length > 0) {
-          const classroomPromises = teacherData.classroomIds.map((id: string) => getDoc(doc(db, 'classrooms', id)));
-          const classroomDocs = await Promise.all(classroomPromises);
-          const classroomsData = classroomDocs
-            .filter(d => d.exists())
-            .map(d => ({ id: d.id, ...d.data() } as Classroom));
-          setClassrooms(classroomsData);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching classrooms:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load your classrooms for sharing.' });
-    }
-  }, [toast]);
-
   useEffect(() => {
     if (user && profile?.role === 'teacher') {
       fetchHistory(user.uid);
-      fetchClassrooms(user.uid);
     } else if (!authLoading) {
       setIsHistoryLoading(false);
     }
-  }, [user, profile, authLoading, fetchHistory, fetchClassrooms]);
+  }, [user, profile, authLoading, fetchHistory]);
 
 
   async function onSubmit(values: LessonPlannerFormValues) {

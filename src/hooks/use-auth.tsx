@@ -17,9 +17,16 @@ interface UserProfile {
     classroomId?: string;
 }
 
+export interface Classroom {
+  id: string;
+  grade: string;
+  section: string;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
+  classrooms: Classroom[];
   loading: boolean;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile | null>>;
 }
@@ -59,6 +66,7 @@ function MissingConfigMessage() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -88,8 +96,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error("Failed to fetch user profile", e)
           }
           setProfile(userProfile);
+          
+          if (userProfile?.role === 'teacher') {
+            setClassrooms([]);
+            try {
+              const teacherRef = doc(db, 'teachers', user.uid);
+              const teacherSnap = await getDoc(teacherRef);
+              if (teacherSnap.exists()) {
+                const teacherData = teacherSnap.data();
+                if (teacherData.classroomIds && teacherData.classroomIds.length > 0) {
+                  const classroomPromises = teacherData.classroomIds.map((id: string) => getDoc(doc(db, 'classrooms', id)));
+                  const classroomDocs = await Promise.all(classroomPromises);
+                  const classroomsData = classroomDocs
+                    .filter(d => d.exists())
+                    .map(d => ({ id: d.id, ...d.data() } as Classroom));
+                  setClassrooms(classroomsData);
+                }
+              }
+            } catch (error) {
+              console.error("Error fetching classrooms:", error);
+            }
+          }
         } else {
           setProfile(null);
+          setClassrooms([]);
         }
         setLoading(false);
       });
@@ -103,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <MissingConfigMessage />;
   }
 
-  return <AuthContext.Provider value={{ user, profile, loading, setProfile }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, profile, loading, classrooms, setProfile }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
