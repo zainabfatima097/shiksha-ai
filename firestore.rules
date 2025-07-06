@@ -1,80 +1,82 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user is a registered teacher.
-    function isTeacher(userId) {
-      return exists(/databases/$(database)/documents/teachers/$(userId));
-    }
-
-    // Helper function to check if a user is a member of a specific classroom.
-    // This is safer as it checks for field existence before trying to access it.
-    function isInClassroom(userId, classroomId) {
-      let classroom = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      let isTeacherMember = 'teacherIds' in classroom && userId in classroom.teacherIds;
-      let isStudentMember = 'studentIds' in classroom && userId in classroom.studentIds;
-      return isTeacherMember || isStudentMember;
+    
+    // Helper function to safely check for field existence and key presence in a list
+    function isIdInList(doc, field, id) {
+      return field in doc.data && id in doc.data[field];
     }
     
-    match /teachers/{teacherId} {
-      // Any logged-in user can read teacher profiles. Needed for classroom member lists.
-      allow read: if request.auth != null;
-      // Teachers can only create or update their OWN profile.
-      allow create, update: if request.auth != null && request.auth.uid == teacherId;
-      
-      // Allow unauthenticated admin panel to read, create, and delete test users.
-      // WARNING: Remove for production.
-      allow read, create, delete: if request.auth == null;
+    // Helper to check if a user is a member of a classroom (teacher or student)
+    function isClassroomMember(classroomId, userId) {
+      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      return isIdInList(classroomDoc, 'teacherIds', userId) || isIdInList(classroomDoc, 'studentIds', userId);
+    }
+    
+    // Helper to check if a user is a teacher of a classroom
+    function isClassroomTeacher(classroomId, userId) {
+      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      return isIdInList(classroomDoc, 'teacherIds', userId);
+    }
 
-      // Teachers can read and create their own lesson history.
+    // Helper function to check if a request comes from the dev admin panel (unauthenticated)
+    function fromAdminPanel() {
+      // THIS IS FOR DEVELOPMENT ONLY.
+      // In production, this should always return false or be removed.
+      return request.auth == null;
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if request.auth != null || fromAdminPanel();
+      // A teacher can only create/update their own document
+      allow create, update: if (request.auth != null && request.auth.uid == teacherId) || fromAdminPanel();
+      allow delete: if fromAdminPanel();
+
+      // A teacher can manage their own lesson history
       match /lessonHistory/{docId} {
         allow read, create: if request.auth != null && request.auth.uid == teacherId;
       }
     }
 
     match /students/{studentId} {
-       // Any logged-in user can read student profiles.
-       allow read: if request.auth != null;
-       // Students can only create or update their OWN profile.
-       allow create, update: if request.auth != null && request.auth.uid == studentId;
-       
-       // Allow unauthenticated admin panel to read, create, and delete test users.
-       // WARNING: Remove for production.
-       allow read, create, delete: if request.auth == null;
+       allow read: if request.auth != null || fromAdminPanel();
+       // A student can only create/update their own document
+       allow create, update: if (request.auth != null && request.auth.uid == studentId) || fromAdminPanel();
+       allow delete: if fromAdminPanel();
     }
     
     match /classrooms/{classroomId} {
-      // Any authenticated user can read classroom lists and individual classrooms.
-      allow read: if request.auth != null;
+      // Allow any authenticated user to see the list of all classrooms (for teachers to browse).
+      allow list: if request.auth != null;
+      // Allow a user to get the details of a specific classroom only if they are a member.
+      allow get: if request.auth != null && isClassroomMember(classroomId, request.auth.uid);
       
-      // Allow admin panel to create classrooms.
-      allow create: if request.auth == null;
-      
-      // Allow teachers to join/leave (update teacherIds) and admin to add students (update studentIds).
-      allow update: if (request.auth != null && isTeacher(request.auth.uid)) || request.auth == null;
+      // `create` is needed for student signup to create a new classroom doc if it doesn't exist.
+      // Unauthenticated admin panel can also create.
+      allow create: if fromAdminPanel() || (request.auth != null && request.resource.data.keys().hasAny(['studentIds']));
+
+      // `update` is needed for teachers to join/leave (modifying `teacherIds`).
+      // WARNING: This rule is permissive. For production, you might restrict this further.
+      allow update: if request.auth != null;
     }
 
     match /classrooms/{classroomId}/posts/{postId} {
-      // Only members of the classroom can read posts.
-      allow read: if request.auth != null && isInClassroom(request.auth.uid, classroomId);
+      allow read: if request.auth != null && isClassroomMember(classroomId, request.auth.uid);
+      
+      // Only teachers in the classroom can create posts.
+      allow create: if request.auth != null && isClassroomTeacher(classroomId, request.auth.uid);
 
-      // Only teachers who are members of the classroom can create posts.
-      allow create: if request.auth != null && 
-                     isTeacher(request.auth.uid) &&
-                     ('teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data && 
-                      request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds);
-
-      // Only the author of the post can delete it, and they must be a teacher.
-      allow delete: if request.auth != null && isTeacher(request.auth.uid) && resource.data.authorId == request.auth.uid;
+      // A teacher can only delete their own posts.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.authorId && isClassroomTeacher(classroomId, request.auth.uid);
     }
     
     match /lessonPlans/{lessonPlanId} {
-        // Any authenticated user can read lesson plans.
-        allow read: if request.auth != null;
-        // Only teachers can create (share) lesson plans.
-        allow create: if request.auth != null && isTeacher(request.auth.uid);
+      // Any authenticated user can read a lesson plan.
+    	allow read: if request.auth != null;
+      // A lesson plan is created when a teacher shares it.
+      // The 'create' rule needs to check that the authorId in the new document matches the signed-in user's ID.
+      allow create: if request.auth != null && request.resource.data.authorId == request.auth.uid;
     }
   }
 }
