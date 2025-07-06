@@ -4,15 +4,16 @@
  * @fileOverview A lesson plan generator AI agent.
  *
  * - generateLessonPlan - A function that handles the lesson plan generation process.
- * - LessonPlanHistoryItem - The type for a single item in the lesson plan history, and the input for generation.
+ * - LessonPlanInput - The type for the generation input.
+ * - LessonPlanHistoryItem - The type for a single item in the lesson plan history.
  * - GenerateLessonPlanOutput - The return type for the generateLessonPlan function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 
-const LessonPlanDataSchema = z.object({
+const LessonPlanInputSchema = z.object({
   subject: z.string().describe('The subject of the lesson plan.'),
   topic: z.string().describe('The specific topic for the week.'),
   gradeLevel: z.string().describe('The grade level of the students.'),
@@ -21,7 +22,13 @@ const LessonPlanDataSchema = z.object({
   additionalDetails: z.string().optional().describe('Any additional details or context for the lesson plan.'),
 });
 
-export type LessonPlanHistoryItem = z.infer<typeof LessonPlanDataSchema>;
+export type LessonPlanInput = z.infer<typeof LessonPlanInputSchema>;
+
+// This schema represents the full document saved in Firestore history
+const LessonPlanHistoryItemSchema = LessonPlanInputSchema.extend({
+    weeklyPlan: z.string().optional().describe("The generated or edited lesson plan content."),
+});
+export type LessonPlanHistoryItem = z.infer<typeof LessonPlanHistoryItemSchema>;
 
 
 const GenerateLessonPlanOutputSchema = z.object({
@@ -30,14 +37,14 @@ const GenerateLessonPlanOutputSchema = z.object({
 export type GenerateLessonPlanOutput = z.infer<typeof GenerateLessonPlanOutputSchema>;
 
 
-export async function generateLessonPlan(input: LessonPlanHistoryItem): Promise<GenerateLessonPlanOutput> {
+export async function generateLessonPlan(input: LessonPlanInput): Promise<GenerateLessonPlanOutput> {
   return generateLessonPlanFlow(input);
 }
 
 
 const prompt = ai.definePrompt({
   name: 'generateLessonPlanPrompt',
-  input: {schema: LessonPlanDataSchema},
+  input: {schema: LessonPlanInputSchema},
   output: {schema: GenerateLessonPlanOutputSchema},
   prompt: `You are an experienced teacher creating a weekly lesson plan.
 
@@ -69,7 +76,7 @@ Your final response must be a JSON object with a single key "weeklyPlan" that co
 
 const generateLessonPlanFlow = ai.defineFlow({
   name: 'generateLessonPlanFlow',
-  inputSchema: LessonPlanDataSchema,
+  inputSchema: LessonPlanInputSchema,
   outputSchema: GenerateLessonPlanOutputSchema,
 },
 async (input) => {

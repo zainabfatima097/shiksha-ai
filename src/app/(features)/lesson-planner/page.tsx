@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { generateLessonPlan, LessonPlanHistoryItem } from '@/ai/flows/ai-lesson-planner';
+import { generateLessonPlan, LessonPlanHistoryItem, LessonPlanInput } from '@/ai/flows/ai-lesson-planner';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
@@ -23,7 +23,7 @@ import {
   CarouselContent,
   CarouselItem,
 } from "@/components/ui/carousel";
-import { Download, BookText, Share2 } from 'lucide-react';
+import { Download, BookText, Share2, Edit } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -53,7 +53,9 @@ export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
   const [lessonPlan, setLessonPlan] = useState('');
+  const [editedLessonPlan, setEditedLessonPlan] = useState('');
   const [history, setHistory] = useState<LessonPlanHistoryItem[]>([]);
   const { toast } = useToast();
   const { user, profile, loading: authLoading } = useAuth();
@@ -106,6 +108,7 @@ export default function LessonPlannerPage() {
                     learningObjectives: data.learningObjectives,
                     localLanguage: data.localLanguage,
                     additionalDetails: data.additionalDetails || '',
+                    weeklyPlan: data.weeklyPlan || '',
                 });
             }
         });
@@ -173,6 +176,7 @@ export default function LessonPlannerPage() {
 
     setIsLoading(true);
     setLessonPlan('');
+    setIsEditing(false);
     try {
       const result = await generateLessonPlan(values);
       setLessonPlan(result.weeklyPlan);
@@ -181,9 +185,9 @@ export default function LessonPlannerPage() {
         const historyRef = collection(db, 'teachers', user.uid, 'lessonHistory');
         await addDoc(historyRef, {
             ...values,
+            weeklyPlan: result.weeklyPlan,
             createdAt: serverTimestamp()
         });
-        // Refetch history after successful save
         await fetchHistory(user.uid);
       } catch (historyError: any) {
         console.error("Failed to save lesson plan history:", historyError);
@@ -207,10 +211,36 @@ export default function LessonPlannerPage() {
     }
   }
 
-  const handleHistoryClick = (item: LessonPlannerFormValues) => {
+  const handleHistoryClick = (item: LessonPlanHistoryItem) => {
     form.reset(item);
-    setLessonPlan('');
+    setLessonPlan(item.weeklyPlan || '');
+    setIsEditing(false);
   };
+  
+  const handleSaveEdit = async () => {
+    if (!user || !db) return;
+    setIsLoading(true);
+    try {
+        const values = form.getValues();
+        const historyData = {
+            ...values,
+            weeklyPlan: editedLessonPlan,
+            createdAt: serverTimestamp()
+        };
+        const historyRef = collection(db, 'teachers', user.uid, 'lessonHistory');
+        await addDoc(historyRef, historyData);
+        
+        setLessonPlan(editedLessonPlan);
+        await fetchHistory(user.uid);
+        toast({ title: "Success", description: "Lesson plan updated and saved to history." });
+    } catch (error) {
+        console.error("Error saving edited lesson plan:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not save your changes.' });
+    } finally {
+        setIsLoading(false);
+        setIsEditing(false);
+    }
+  }
 
   const handleExportToPdf = () => {
     const input = lessonPlanRef.current;
@@ -276,7 +306,6 @@ export default function LessonPlannerPage() {
 
     setIsSharing(true);
     try {
-      // 1. Create the main lesson plan document in a new collection
       const lessonPlanData = {
         authorId: user.uid,
         authorName: profile.name,
@@ -288,7 +317,6 @@ export default function LessonPlannerPage() {
       };
       const lessonPlanRef = await addDoc(collection(db, 'lessonPlans'), lessonPlanData);
 
-      // 2. Create a post in the classroom feed that links to the lesson plan
       const postData = {
         authorId: user.uid,
         authorName: profile.name,
@@ -484,7 +512,7 @@ export default function LessonPlannerPage() {
               </Card>
 
               <div className="lg:col-span-1 lg:sticky lg:top-8 self-start mt-8 lg:mt-0">
-                  {isLoading && (
+                  {isLoading && !lessonPlan && (
                       <Card>
                         <CardHeader>
                           <div className="flex justify-between items-center">
@@ -509,67 +537,92 @@ export default function LessonPlannerPage() {
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
                                     <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={handleExportToPdf}
-                                            disabled={isPdfLoading}
-                                            aria-label="Export to PDF"
-                                            title="Export to PDF"
-                                        >
-                                            {isPdfLoading ? <LoadingSpinner className="h-5 w-5"/> : <Download className="h-5 w-5" />}
-                                        </Button>
+                                    {isEditing ? (
+                                        <>
+                                            <Button variant="default" size="sm" onClick={handleSaveEdit} disabled={isLoading}>
+                                                {isLoading && <LoadingSpinner className="mr-2 h-4 w-4" />}
+                                                Save
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={isLoading}>Cancel</Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Button variant="ghost" size="icon" onClick={() => { setIsEditing(true); setEditedLessonPlan(lessonPlan); }} aria-label="Edit Plan" title="Edit Plan">
+                                                <Edit className="h-5 w-5" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={handleExportToPdf}
+                                                disabled={isPdfLoading}
+                                                aria-label="Export to PDF"
+                                                title="Export to PDF"
+                                            >
+                                                {isPdfLoading ? <LoadingSpinner className="h-5 w-5"/> : <Download className="h-5 w-5" />}
+                                            </Button>
 
-                                        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    disabled={!lessonPlan || classrooms.length === 0} 
-                                                    aria-label="Share to classroom" 
-                                                    title="Share to classroom"
-                                                >
-                                                    <Share2 className="h-5 w-5" />
-                                                </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Share Lesson Plan</DialogTitle>
-                                                    <DialogDescription>
-                                                        Select a classroom to post this lesson plan to their feed.
-                                                        {classrooms.length === 0 && <span className="text-destructive block mt-2">You have not joined any classrooms.</span>}
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <div className="py-4">
-                                                    <Select onValueChange={setSelectedClassroom} defaultValue={selectedClassroom}>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select a classroom..." />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {classrooms.map(c => (
-                                                                <SelectItem key={c.id} value={c.id}>
-                                                                    Grade {c.grade} - Section {c.section}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>Cancel</Button>
-                                                    <Button onClick={handleShare} disabled={!selectedClassroom || isSharing}>
-                                                        {isSharing && <LoadingSpinner className="mr-2 h-4 w-4" />}
-                                                        Share
+                                            <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+                                                <DialogTrigger asChild>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        disabled={!lessonPlan || classrooms.length === 0} 
+                                                        aria-label="Share to classroom" 
+                                                        title="Share to classroom"
+                                                    >
+                                                        <Share2 className="h-5 w-5" />
                                                     </Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Share Lesson Plan</DialogTitle>
+                                                        <DialogDescription>
+                                                            Select a classroom to post this lesson plan to their feed.
+                                                            {classrooms.length === 0 && <span className="text-destructive block mt-2">You have not joined any classrooms.</span>}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="py-4">
+                                                        <Select onValueChange={setSelectedClassroom} defaultValue={selectedClassroom}>
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select a classroom..." />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {classrooms.map(c => (
+                                                                    <SelectItem key={c.id} value={c.id}>
+                                                                        Grade {c.grade} - Section {c.section}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>Cancel</Button>
+                                                        <Button onClick={handleShare} disabled={!selectedClassroom || isSharing}>
+                                                            {isSharing && <LoadingSpinner className="mr-2 h-4 w-4" />}
+                                                            Share
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </>
+                                    )}
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="prose prose-sm max-w-none dark:prose-invert">
-                                    <ReactMarkdown>{lessonPlan}</ReactMarkdown>
-                                </div>
+                                {isEditing ? (
+                                    <Textarea 
+                                        value={editedLessonPlan}
+                                        onChange={(e) => setEditedLessonPlan(e.target.value)}
+                                        rows={25}
+                                        className="font-mono text-sm"
+                                        disabled={isLoading}
+                                    />
+                                ) : (
+                                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                                        <ReactMarkdown>{lessonPlan}</ReactMarkdown>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                       </div>
