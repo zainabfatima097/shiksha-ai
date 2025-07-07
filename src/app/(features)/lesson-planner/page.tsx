@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { generateLessonPlan, LessonPlanHistoryItem, LessonPlanInput } from '@/ai/flows/ai-lesson-planner';
+import { generateLessonPlan } from '@/ai/flows/ai-lesson-planner';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
@@ -24,15 +24,8 @@ import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
 
 
 const lessonPlannerSchema = z.object({
@@ -49,11 +42,9 @@ type LessonPlannerFormValues = z.infer<typeof lessonPlannerSchema>;
 export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [lessonPlan, setLessonPlan] = useState('');
   const [editedLessonPlan, setEditedLessonPlan] = useState('');
-  const [history, setHistory] = useState<LessonPlanHistoryItem[]>([]);
   const { toast } = useToast();
   const { user, profile, loading: authLoading, classrooms } = useAuth();
   const lessonPlanRef = useRef<HTMLDivElement>(null);
@@ -82,83 +73,6 @@ export default function LessonPlannerPage() {
     },
   });
 
-  const refetchHistory = async (uid: string) => {
-    if (!db) return [];
-     try {
-        const historyRef = collection(db, 'teachers', uid, 'lessonHistory');
-        const q = query(historyRef, orderBy('createdAt', 'desc'), limit(12));
-        const querySnapshot = await getDocs(q);
-
-        const historyData: LessonPlanHistoryItem[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.subject && data.topic && data.gradeLevel && data.learningObjectives && data.localLanguage) {
-                historyData.push({
-                    subject: data.subject,
-                    topic: data.topic,
-                    gradeLevel: data.gradeLevel,
-                    learningObjectives: data.learningObjectives,
-                    localLanguage: data.localLanguage,
-                    additionalDetails: data.additionalDetails || '',
-                    weeklyPlan: data.weeklyPlan || '',
-                });
-            }
-        });
-        return historyData;
-    } catch (error) {
-        console.error("Error refetching history", error);
-        return [];
-    }
-  }
-
-  useEffect(() => {
-    if (!user || !profile || profile.role !== 'teacher' || !db) {
-        if (!authLoading) {
-            setIsHistoryLoading(false);
-        }
-        return;
-    }
-
-    let isMounted = true;
-    setIsHistoryLoading(true);
-
-    const fetchInitialHistory = async () => {
-        try {
-            const historyData = await refetchHistory(user.uid);
-            if (isMounted) {
-                setHistory(historyData);
-            }
-        } catch (error: any) {
-            if (isMounted) {
-                console.error("Failed to fetch history from database", error);
-                let description = 'Could not load your recent plans. An unknown error occurred.';
-                 if (error.code === 'failed-precondition') {
-                    description = `A Firestore index is required. Please create it in your Firebase console. The error was: "${error.message}"`;
-                } else if (error.code === 'permission-denied') {
-                    description = 'Permission denied. Please check your Firestore security rules to ensure you can read from the "lessonHistory" collection.';
-                }
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'Error Loading History', 
-                    description: description,
-                    duration: 9000,
-                });
-            }
-        } finally {
-            if (isMounted) {
-                setIsHistoryLoading(false);
-            }
-        }
-    };
-    
-    fetchInitialHistory();
-
-    return () => {
-        isMounted = false;
-    };
-  }, [user, profile, authLoading, toast]);
-
-
   async function onSubmit(values: LessonPlannerFormValues) {
     if (!user || !db) {
       toast({
@@ -175,26 +89,6 @@ export default function LessonPlannerPage() {
     try {
       const result = await generateLessonPlan(values);
       setLessonPlan(result.weeklyPlan);
-
-      try {
-        const historyRef = collection(db, 'teachers', user.uid, 'lessonHistory');
-        await addDoc(historyRef, {
-            ...values,
-            weeklyPlan: result.weeklyPlan,
-            createdAt: serverTimestamp()
-        });
-        const newHistory = await refetchHistory(user.uid);
-        setHistory(newHistory);
-      } catch (historyError: any) {
-        console.error("Failed to save lesson plan history:", historyError);
-        toast({
-            variant: 'destructive',
-            title: 'Could Not Save History',
-            description: `An error occurred while saving: ${historyError.message}. Please check your Firestore security rules.`,
-            duration: 9000,
-        });
-      }
-
     } catch (error) {
       console.error('Error generating lesson plan:', error);
       toast({
@@ -207,36 +101,10 @@ export default function LessonPlannerPage() {
     }
   }
 
-  const handleHistoryClick = (item: LessonPlanHistoryItem) => {
-    form.reset(item);
-    setLessonPlan(item.weeklyPlan || '');
+  const handleSaveEdit = () => {
+    setLessonPlan(editedLessonPlan);
     setIsEditing(false);
-  };
-  
-  const handleSaveEdit = async () => {
-    if (!user || !db) return;
-    setIsLoading(true);
-    try {
-        const values = form.getValues();
-        const historyData = {
-            ...values,
-            weeklyPlan: editedLessonPlan,
-            createdAt: serverTimestamp()
-        };
-        const historyRef = collection(db, 'teachers', user.uid, 'lessonHistory');
-        await addDoc(historyRef, historyData);
-        
-        setLessonPlan(editedLessonPlan);
-        const newHistory = await refetchHistory(user.uid);
-        setHistory(newHistory);
-        toast({ title: "Success", description: "Lesson plan updated and saved to history." });
-    } catch (error) {
-        console.error("Error saving edited lesson plan:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not save your changes.' });
-    } finally {
-        setIsLoading(false);
-        setIsEditing(false);
-    }
+    toast({ title: "Success", description: "Lesson plan updated." });
   }
 
   const handleExportToPdf = () => {
@@ -366,48 +234,6 @@ export default function LessonPlannerPage() {
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
         <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-                <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
-                {isHistoryLoading ? (
-                    <div className="flex space-x-4">
-                        <Skeleton className="h-28 flex-1 rounded-lg" />
-                        <Skeleton className="h-28 flex-1 rounded-lg hidden md:block" />
-                        <Skeleton className="h-28 flex-1 rounded-lg hidden lg:block" />
-                    </div>
-                ) : history.length > 0 ? (
-                    <Carousel
-                        opts={{
-                            align: "start",
-                        }}
-                        className="w-full"
-                    >
-                        <CarouselContent className="-ml-2">
-                            {history.map((item, index) => (
-                                <CarouselItem key={index} className="pl-2 sm:basis-1/2 md:basis-1/3 lg:basis-1/4">
-                                     <Card
-                                        className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
-                                        onClick={() => handleHistoryClick(item)}
-                                    >
-                                        <CardHeader className="p-3">
-                                            <CardTitle className="text-base font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
-                                            <CardDescription className="text-xs">{item.gradeLevel} &middot; {item.subject}</CardDescription>
-                                        </CardHeader>
-                                    </Card>
-                                </CarouselItem>
-                            ))}
-                        </CarouselContent>
-                        <CarouselPrevious className="hidden sm:flex" />
-                        <CarouselNext className="hidden sm:flex" />
-                    </Carousel>
-                ) : (
-                    <Card className="bg-secondary/50 border-dashed">
-                        <CardContent className="p-6">
-                            <p className="text-center text-muted-foreground">You have no recent lesson plans. Generate one below to get started!</p>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 items-start">
               <Card className="lg:col-span-1">
                   <CardHeader className="p-4 md:p-6">
@@ -545,11 +371,10 @@ export default function LessonPlannerPage() {
                                     <div className="flex items-center gap-1">
                                     {isEditing ? (
                                         <>
-                                            <Button variant="default" size="sm" onClick={handleSaveEdit} disabled={isLoading}>
-                                                {isLoading && <LoadingSpinner className="mr-2 h-4 w-4" />}
+                                            <Button variant="default" size="sm" onClick={handleSaveEdit}>
                                                 Save
                                             </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={isLoading}>Cancel</Button>
+                                            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
                                         </>
                                     ) : (
                                         <>
@@ -622,7 +447,6 @@ export default function LessonPlannerPage() {
                                         onChange={(e) => setEditedLessonPlan(e.target.value)}
                                         rows={25}
                                         className="font-mono text-sm"
-                                        disabled={isLoading}
                                     />
                                 ) : (
                                     <div className="prose prose-sm max-w-none dark:prose-invert">
@@ -649,3 +473,5 @@ export default function LessonPlannerPage() {
     </div>
   );
 }
+
+    
