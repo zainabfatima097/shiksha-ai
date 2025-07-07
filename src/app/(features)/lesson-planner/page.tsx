@@ -354,9 +354,11 @@ export default function LessonPlannerPage() {
 
   return (
     <div className="flex flex-col h-full">
-       <header className="flex items-center justify-between p-4 border-b md:hidden">
-            <h1 className="font-headline text-xl font-bold text-primary truncate">Lesson Planner</h1>
-            <SidebarTrigger />
+       <header className="flex items-center justify-between p-4 border-b md:hidden gap-4">
+            <div className="flex-1 min-w-0">
+                <h1 className="font-headline text-xl font-bold text-primary truncate">Lesson Planner</h1>
+            </div>
+            <SidebarTrigger className="flex-shrink-0" />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
         <div className="max-w-7xl mx-auto">
@@ -370,9 +372,9 @@ export default function LessonPlannerPage() {
                     </div>
                 ) : history.length > 0 ? (
                 <Carousel opts={{ align: "start", loop: false, dragFree: true }} className="w-full">
-                    <CarouselContent className="-ml-2">
+                    <CarouselContent className="-ml-4">
                     {history.map((item, index) => (
-                        <CarouselItem key={index} className="pl-2 basis-11/12 md:basis-1/2 lg:basis-1/3">
+                        <CarouselItem key={index} className="pl-4 basis-5/6 md:basis-1/2 lg:basis-1/3">
                         <div className="p-1">
                             <Card
                             className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
@@ -406,7 +408,7 @@ export default function LessonPlannerPage() {
                   <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
                   <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                           control={form.control}
                           name="subject"
@@ -604,7 +606,7 @@ export default function LessonPlannerPage() {
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-4 md:p-6">
+                            <CardContent className="p-4 md:p-6 overflow-x-auto">
                                 {isEditing ? (
                                     <Textarea 
                                         value={editedLessonPlan}
@@ -614,7 +616,7 @@ export default function LessonPlannerPage() {
                                         disabled={isLoading}
                                     />
                                 ) : (
-                                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-x-auto">
+                                    <div className="prose prose-sm max-w-none dark:prose-invert">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{lessonPlan}</ReactMarkdown>
                                     </div>
                                 )}
