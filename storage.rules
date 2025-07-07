@@ -1,39 +1,45 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-  
-    // Classroom files: PDFs, etc.
-    // Path: /classrooms/{classroomId}/files/{fileName}
-    match /classrooms/{classroomId}/files/{fileName} {
-    
-      // READ: Allow any authenticated user who is a member of the classroom (teacher or student).
-      function isClassroomMember(classroomId) {
-        let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-        // The document must exist to proceed.
-        if (!exists(/databases/$(database)/documents/classrooms/$(classroomId))) {
-          return false;
-        }
-        let classroomData = classroomDoc.data;
-        let isTeacher = 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
-        let isStudent = 'studentIds' in classroomData && request.auth.uid in classroomData.studentIds;
-        return isTeacher || isStudent;
-      }
-    
-      allow read: if request.auth != null && isClassroomMember(classroomId);
-
-      // WRITE: Allow only teachers who are members of the classroom.
-      function isClassroomTeacher(classroomId) {
-        let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-        // The document must exist to proceed.
-        if (!exists(/databases/$(database)/documents/classrooms/$(classroomId))) {
-          return false;
-        }
-        let classroomData = classroomDoc.data;
-        return 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
-      }
+    match /classrooms/{classroomId}/files/{fileId} {
       
-      allow write: if request.auth != null && isClassroomTeacher(classroomId);
+      // A user can read a file if they are authenticated and are either a student in the classroom
+      // or a teacher assigned to the classroom. This rule safely checks for the existence of
+      // the classroom and student records before accessing them.
+      allow read: if request.auth != null && (
+        (
+          exists(/databases/(default)/documents/students/$(request.auth.uid)) &&
+          get(/databases/(default)/documents/students/$(request.auth.uid)).data.classroomId == classroomId
+        ) || (
+          exists(/databases/(default)/documents/classrooms/$(classroomId)) &&
+          'teacherIds' in get(/databases/(default)/documents/classrooms/$(classroomId)).data &&
+          request.auth.uid in get(/databases/(default)/documents/classrooms/$(classroomId)).data.teacherIds
+        )
+      );
+
+      // A user can create/upload a file if they are an authenticated teacher in the classroom,
+      // the file is a PDF, and it is less than 10MB. This rule safely checks that the 'teacherIds'
+      // field exists before trying to access it.
+      allow create: if request.auth != null &&
+        request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('application/pdf') &&
+        (
+          exists(/databases/(default)/documents/classrooms/$(classroomId)) &&
+          'teacherIds' in get(/databases/(default)/documents/classrooms/$(classroomId)).data &&
+          request.auth.uid in get(/databases/(default)/documents/classrooms/$(classroomId)).data.teacherIds
+        );
+        
+      // No one can update files. They must be deleted and re-uploaded.
+      allow update: if false;
+      
+      // A user can delete a file if they are an authenticated teacher in the classroom.
+      allow delete: if request.auth != null && (
+        exists(/databases/(default)/documents/classrooms/$(classroomId)) &&
+        'teacherIds' in get(/databases/(default)/documents/classrooms/$(classroomId)).data &&
+        request.auth.uid in get(/databases/(default)/documents/classrooms/$(classroomId)).data.teacherIds
+      );
     }
   }
 }
