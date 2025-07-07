@@ -26,6 +26,13 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 
 const lessonPlannerSchema = z.object({
@@ -363,26 +370,35 @@ export default function LessonPlannerPage() {
                 <h2 className="text-2xl font-headline mb-4 text-primary">Recent Plans</h2>
                 {isHistoryLoading ? (
                     <div className="flex space-x-4">
-                    <Skeleton className="h-28 flex-1 rounded-lg" />
-                    <Skeleton className="h-28 flex-1 rounded-lg md:block hidden" />
-                    <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
+                        <Skeleton className="h-28 flex-1 rounded-lg" />
+                        <Skeleton className="h-28 flex-1 rounded-lg hidden md:block" />
+                        <Skeleton className="h-28 flex-1 rounded-lg hidden lg:block" />
                     </div>
                 ) : history.length > 0 ? (
-                <div className="flex flex-wrap -m-2">
-                    {history.map((item, index) => (
-                        <div key={index} className="w-full sm:w-1/2 md:w-1/3 lg:w-1/4 p-2">
-                            <Card
-                                className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
-                                onClick={() => handleHistoryClick(item)}
-                            >
-                                <CardHeader>
-                                    <CardTitle className="text-base font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
-                                    <CardDescription className="text-sm">{item.gradeLevel} &middot; {item.subject}</CardDescription>
-                                </CardHeader>
-                            </Card>
-                        </div>
-                    ))}
-                </div>
+                    <Carousel
+                        opts={{
+                            align: "start",
+                        }}
+                        className="w-full"
+                    >
+                        <CarouselContent className="-ml-2">
+                            {history.map((item, index) => (
+                                <CarouselItem key={index} className="pl-2 sm:basis-1/2 md:basis-1/3 lg:basis-1/4">
+                                     <Card
+                                        className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
+                                        onClick={() => handleHistoryClick(item)}
+                                    >
+                                        <CardHeader className="p-3">
+                                            <CardTitle className="text-base font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
+                                            <CardDescription className="text-xs">{item.gradeLevel} &middot; {item.subject}</CardDescription>
+                                        </CardHeader>
+                                    </Card>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <CarouselPrevious className="hidden sm:flex" />
+                        <CarouselNext className="hidden sm:flex" />
+                    </Carousel>
                 ) : (
                     <Card className="bg-secondary/50 border-dashed">
                         <CardContent className="p-6">
