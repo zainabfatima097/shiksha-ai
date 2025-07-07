@@ -19,11 +19,6 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel";
 import { Download, BookText, Share2, Edit } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -84,7 +79,7 @@ export default function LessonPlannerPage() {
     if (!db) return [];
      try {
         const historyRef = collection(db, 'teachers', uid, 'lessonHistory');
-        const q = query(historyRef, orderBy('createdAt', 'desc'), limit(5));
+        const q = query(historyRef, orderBy('createdAt', 'desc'), limit(12));
         const querySnapshot = await getDocs(q);
 
         const historyData: LessonPlanHistoryItem[] = [];
@@ -322,7 +317,9 @@ export default function LessonPlannerPage() {
         subject: form.getValues('subject'),
       };
 
-      await addDoc(collection(db, 'classrooms', selectedClassroom, 'posts'), postData);
+      if (db) {
+        await addDoc(collection(db, 'classrooms', selectedClassroom, 'posts'), postData);
+      }
       
       const classroom = classrooms.find(c => c.id === selectedClassroom);
       toast({
@@ -371,25 +368,21 @@ export default function LessonPlannerPage() {
                     <Skeleton className="h-28 flex-1 rounded-lg lg:block hidden" />
                     </div>
                 ) : history.length > 0 ? (
-                <Carousel opts={{ align: "start", loop: false, dragFree: true }} className="w-full">
-                    <CarouselContent className="-ml-4">
+                <div className="flex flex-wrap -m-2">
                     {history.map((item, index) => (
-                        <CarouselItem key={index} className="pl-4 basis-5/6 md:basis-1/2 lg:basis-1/3">
-                        <div className="p-1">
+                        <div key={index} className="w-full sm:w-1/2 md:w-1/3 lg:w-1/4 p-2">
                             <Card
-                            className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
-                            onClick={() => handleHistoryClick(item)}
+                                className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
+                                onClick={() => handleHistoryClick(item)}
                             >
-                            <CardHeader>
-                                <CardTitle className="text-lg font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
-                                <CardDescription>{item.gradeLevel} &middot; {item.subject}</CardDescription>
-                            </CardHeader>
+                                <CardHeader>
+                                    <CardTitle className="text-base font-bold truncate" title={item.topic}>{item.topic}</CardTitle>
+                                    <CardDescription className="text-sm">{item.gradeLevel} &middot; {item.subject}</CardDescription>
+                                </CardHeader>
                             </Card>
                         </div>
-                        </CarouselItem>
                     ))}
-                    </CarouselContent>
-                </Carousel>
+                </div>
                 ) : (
                     <Card className="bg-secondary/50 border-dashed">
                         <CardContent className="p-6">
@@ -407,7 +400,7 @@ export default function LessonPlannerPage() {
                   </CardHeader>
                   <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
                   <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField
                           control={form.control}
