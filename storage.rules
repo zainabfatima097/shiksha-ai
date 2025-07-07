@@ -2,18 +2,26 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    // Rules for classroom files
     match /classrooms/{classroomId}/files/{fileName} {
-      // Read access is handled by download URLs in the app, 
-      // but this rule allows authenticated users to read directly via SDK if needed.
-      allow read: if request.auth != null;
 
-      // Allow write access only to teachers who are members of the classroom.
-      // This rule first checks if the user is a teacher and if the classroomIds field exists
-      // before checking for membership, preventing errors for new teachers.
+      // WRITE: Allow teachers to write to classrooms they are members of.
+      // This is determined by checking if their UID is in the `teacherIds` array of the classroom document.
       allow write: if request.auth != null &&
-                      get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher' &&
-                      'classroomIds' in get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data &&
-                      classroomId in get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.classroomIds;
+                    exists(/databases/$(database)/documents/classrooms/$(classroomId)) &&
+                    request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds;
+
+      // READ: Allow teachers and students to read files if they are members of the classroom.
+      allow read: if request.auth != null && (
+                    // Teachers can read if they are in the classroom's `teacherIds` list.
+                    (exists(/databases/$(database)/documents/classrooms/$(classroomId)) &&
+                     'teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data &&
+                     request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds) ||
+
+                    // Students can read if their profile's `classroomId` matches this classroom.
+                    (exists(/databases/$(database)/documents/students/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/students/$(request.auth.uid)).data.classroomId == classroomId)
+                  );
     }
   }
 }
