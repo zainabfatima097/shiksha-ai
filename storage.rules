@@ -1,37 +1,19 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Helper functions to check user roles and classroom membership from Firestore
-    function isTeacherInClassroom(userId, classroomId) {
-      let teacherDoc = get(/databases/$(database)/documents/teachers/$(userId)).data;
-      // Check if the user is a teacher and if the classroomId is in their list of classrooms.
-      return teacherDoc.role == 'teacher' && classroomId in teacherDoc.classroomIds;
-    }
-    
-    function isStudentInClassroom(userId, classroomId) {
-      let studentDoc = get(/databases/$(database)/documents/students/$(userId)).data;
-      // Check if the user is a student and if their classroomId matches.
-      return studentDoc.role == 'student' && studentDoc.classroomId == classroomId;
-    }
-
-    // Rules for files within a specific classroom's folder
     match /classrooms/{classroomId}/files/{fileName} {
-      
-      // Any authenticated member (teacher or student) of the classroom can read files.
-      allow read: if request.auth != null && 
-                    (isTeacherInClassroom(request.auth.uid, classroomId) || isStudentInClassroom(request.auth.uid, classroomId));
+      // Read access is handled by download URLs in the app, 
+      // but this rule allows authenticated users to read directly via SDK if needed.
+      allow read: if request.auth != null;
 
-      // Only teachers who are members of the classroom can upload (create) PDFs under 10MB.
-      allow create: if request.auth != null &&
-                     isTeacherInClassroom(request.auth.uid, classroomId) &&
-                     request.resource.size < 10 * 1024 * 1024 &&
-                     request.resource.contentType.matches('application/pdf');
-      
-      // Deny updates and deletes from the client to prevent accidental data modification.
-      allow update, delete: if false;
+      // Allow write access only to teachers who are members of the classroom.
+      // This rule first checks if the user is a teacher and if the classroomIds field exists
+      // before checking for membership, preventing errors for new teachers.
+      allow write: if request.auth != null &&
+                      get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher' &&
+                      'classroomIds' in get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data &&
+                      classroomId in get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.classroomIds;
     }
   }
 }
