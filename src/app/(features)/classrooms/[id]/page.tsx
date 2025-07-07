@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, addDoc, serverTimestamp, orderBy, onSnapshot, deleteDoc } from 'firebase/firestore';
@@ -12,7 +13,7 @@ import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Users, ArrowRight, BookOpenCheck, Trash2, Sheet, Paperclip, X, File as FileIcon } from 'lucide-react';
+import { Send, Users, ArrowRight, BookOpenCheck, Trash2, Sheet, Paperclip, X, File as FileIcon, FileImage } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,7 +45,7 @@ interface Post {
   authorName: string;
   content?: string;
   createdAt: any; // Firestore timestamp
-  type?: 'message' | 'lessonPlan' | 'worksheet' | 'pdf';
+  type?: 'message' | 'lessonPlan' | 'worksheet' | 'pdf' | 'image';
   lessonPlanId?: string;
   worksheetId?: string;
   topic?: string;
@@ -176,12 +177,11 @@ export default function ClassroomDetailPage() {
     }
     const file = e.target.files?.[0];
     if (file) {
-      // Explicitly check for PDF file type
-      if (file.type !== 'application/pdf') {
+      if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) {
         toast({
           variant: 'destructive',
           title: 'Invalid File Type',
-          description: 'Please select a PDF file.',
+          description: 'Please select a PDF or an image file.',
         });
         return;
       }
@@ -190,7 +190,7 @@ export default function ClassroomDetailPage() {
         toast({
           variant: 'destructive',
           title: 'File too large',
-          description: 'Please upload a PDF smaller than 10MB.',
+          description: 'Please upload a file smaller than 10MB.',
         });
         return;
       }
@@ -216,13 +216,15 @@ export default function ClassroomDetailPage() {
         
         await uploadBytes(fileRef, file);
         const downloadURL = await getDownloadURL(fileRef);
+        
+        const postType = file.type.startsWith('image/') ? 'image' : 'pdf';
 
         await addDoc(collection(db, 'classrooms', classroomId, 'posts'), {
           authorId: user.uid,
           authorName: profile.name,
           content: values.message || '',
           createdAt: serverTimestamp(),
-          type: 'pdf',
+          type: postType,
           fileName: file.name,
           fileUrl: downloadURL,
         });
@@ -384,6 +386,23 @@ export default function ClassroomDetailPage() {
                                         </div>
                                       </CardContent>
                                     </Card>
+                                ) : post.type === 'image' ? (
+                                    <Card className="mt-2 bg-background">
+                                      <CardContent className="p-4">
+                                        {post.content && <p className="text-sm text-foreground mb-3 whitespace-pre-wrap">{post.content}</p>}
+                                        {post.fileUrl && (
+                                           <a href={post.fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                            <Image 
+                                                src={post.fileUrl} 
+                                                alt={post.fileName || 'Uploaded image'}
+                                                width={400} 
+                                                height={300} 
+                                                className="rounded-md object-cover w-full max-h-80"
+                                            />
+                                           </a>
+                                        )}
+                                      </CardContent>
+                                    </Card>
                                 ) : (
                                     <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
                                 )}
@@ -439,7 +458,7 @@ export default function ClassroomDetailPage() {
                                     }
                                 }}
                                 />
-                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="application/pdf" />
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="application/pdf,image/*" />
                                 <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                     <Paperclip className="h-4 w-4" />
                                     <span className="sr-only">Attach file</span>
@@ -451,7 +470,7 @@ export default function ClassroomDetailPage() {
                             {selectedFile && (
                                 <div className="flex items-center justify-between p-2 pl-3 bg-muted rounded-md text-sm">
                                     <div className="flex items-center gap-2 overflow-hidden">
-                                        <FileIcon className="h-4 w-4 text-muted-foreground" />
+                                        {selectedFile.type.startsWith('image/') ? <FileImage className="h-4 w-4 text-muted-foreground" /> : <FileIcon className="h-4 w-4 text-muted-foreground" />}
                                         <span className="truncate">{selectedFile.name}</span>
                                     </div>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFile(null)} disabled={isUploading}>
