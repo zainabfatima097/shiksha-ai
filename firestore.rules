@@ -4,77 +4,102 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    function isTeacher(userId) {
-      return exists(/databases/$(database)/documents/teachers/$(userId));
+    // Helper function to check for a developer admin.
+    // NOTE: This uses 'exists' which is safer than a direct 'get' if the doc might not exist.
+    function isDevAdmin() {
+      return request.auth != null && 
+             exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.dev_generated == true;
     }
 
-    function isClassroomMember(classroomId, userId) {
-      let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      let studentIds = classroomData.get('studentIds', []);
-      let teacherIds = classroomData.get('teacherIds', []);
-      return userId in studentIds || userId in teacherIds;
+    // DEV ADMIN: Allow broad read/write access ONLY for developer-generated accounts.
+    // This rule is designed for seeding data and should not be used in production.
+    match /{document=**} {
+      allow read, write: if isDevAdmin();
+    }
+
+    // TEACHERS can read their own profile and any other teacher's profile.
+    // They can only update their own profile.
+    match /teachers/{teacherId} {
+      allow get, list: if request.auth != null;
+      allow update: if request.auth != null && request.auth.uid == teacherId;
+      // create is handled by signup or admin panel
     }
     
-    function isClassroomTeacher(classroomId, userId) {
-      let classroomData = get(/databases/$(database)/documents/classrooms/$(classroomId)).data;
-      let teacherIds = classroomData.get('teacherIds', []);
-      return userId in teacherIds;
+    // STUDENTS can read their own profile. Teachers can read any student profile.
+    match /students/{studentId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == studentId;
+      }
+      function isTeacher() {
+        return request.auth != null && 
+               exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) && 
+               get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher';
+      }
+      
+      allow get: if isOwner() || isTeacher();
+      allow list: if isTeacher();
+      // create is handled by signup or admin panel
     }
+    
+    // CLASSROOMS
+    match /classrooms/{classroomId} {
+       // Any authenticated user can list classrooms (for teacher "Join" view)
+      allow list: if request.auth != null;
+      
+      // Only members of a classroom can get its full details.
+      allow get: if request.auth != null && 
+                  (request.auth.uid in resource.data.teacherIds || request.auth.uid in resource.data.studentIds);
+                  
+      // Only teachers can update classroom details (e.g., joining/leaving)
+      allow update: if request.auth != null && 
+                     exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) &&
+                     get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher';
+      // create is handled by signup or admin panel
 
-    match /teachers/{teacherId} {
-      allow read: if true;
-      allow create: if (request.auth.uid == teacherId) || (request.auth == null);
-      allow update: if request.auth.uid == teacherId;
-      allow delete: if request.auth == null;
+      // POSTS inside classrooms
+      match /posts/{postId} {
+        function isClassroomMember() {
+          let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+          return request.auth != null &&
+                 (request.auth.uid in classroomDoc.data.teacherIds || request.auth.uid in classroomDoc.data.studentIds);
+        }
 
-      match /lessonHistory/{docId} {
-        allow read, create: if request.auth.uid == teacherId;
+        function isValidPostRequest() {
+          return request.auth != null && 
+                 request.auth.uid == request.resource.data.authorId &&
+                 exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) &&
+                 get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'teacher';
+        }
+
+        function isValidPostType() {
+          let postData = request.resource.data;
+          return (postData.type == 'message' && postData.content is string) ||
+                 (postData.type == 'lessonPlan' && postData.lessonPlanId is string && postData.topic is string && postData.subject is string) ||
+                 (postData.type == 'worksheet' && postData.worksheetId is string && postData.gradeLevel is string) ||
+                 (postData.type == 'pdf' && postData.fileUrl is string && postData.fileName is string && postData.content is string);
+        }
+
+        allow read: if isClassroomMember();
+        allow create: if isValidPostRequest() && isValidPostType();
+        allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
       }
     }
 
-    match /students/{studentId} {
-       allow read: if true;
-       allow create: if (request.auth.uid == studentId) || (request.auth == null);
-       allow update: if request.auth.uid == studentId;
-       allow delete: if request.auth == null;
-    }
-    
-    match /classrooms/{classroomId} {
-      allow list: if request.auth != null;
-      allow get: if (request.auth != null && isClassroomMember(classroomId, request.auth.uid)) || (request.auth == null);
-      allow create, update: if (request.auth != null && isTeacher(request.auth.uid)) || request.auth == null;
-    }
-
-    match /classrooms/{classroomId}/posts/{postId} {
-      allow read: if (request.auth != null && isClassroomMember(classroomId, request.auth.uid)) || (request.auth == null);
-      allow create: if request.auth != null 
-                      && isClassroomTeacher(classroomId, request.auth.uid)
-                      && request.resource.data.authorId == request.auth.uid
-                      && request.resource.data.authorName is string
-                      && request.resource.data.type in ['message', 'lessonPlan', 'worksheet'];
-      allow delete: if request.auth != null && resource.data.authorId == request.auth.uid && isClassroomTeacher(classroomId, request.auth.uid);
-    }
-    
+    // LESSON PLANS & WORKSHEETS
     match /lessonPlans/{lessonPlanId} {
-      allow read: if true;
-      allow create: if request.auth != null 
-                      && isTeacher(request.auth.uid)
-                      && request.resource.data.authorId == request.auth.uid
-                      && request.resource.data.authorName is string
-                      && request.resource.data.topic is string
-                      && request.resource.data.subject is string
-                      && request.resource.data.gradeLevel is string
-                      && request.resource.data.weeklyPlan is string;
+      allow read: if request.auth != null; // Any authenticated user can read if they have the ID
+      allow create: if request.auth.uid == request.resource.data.authorId;
     }
     
     match /worksheets/{worksheetId} {
-      allow read: if true;
-      allow create: if request.auth != null 
-                      && isTeacher(request.auth.uid)
-                      && request.resource.data.authorId == request.auth.uid
-                      && request.resource.data.authorName is string
-                      && request.resource.data.gradeLevel is string
-                      && request.resource.data.worksheetContent is string;
+        allow read: if request.auth != null;
+        allow create: if request.auth.uid == request.resource.data.authorId && request.resource.data.worksheetContent is string && request.resource.data.gradeLevel is string;
+    }
+
+    // LESSON HISTORY (subcollection of teacher)
+    match /teachers/{teacherId}/lessonHistory/{historyId} {
+      allow read, create: if request.auth != null && request.auth.uid == teacherId;
     }
   }
 }

@@ -3,15 +3,16 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, collection, query, addDoc, serverTimestamp, orderBy, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Users, ArrowRight, BookOpenCheck, Trash2, Sheet } from 'lucide-react';
+import { Send, Users, ArrowRight, BookOpenCheck, Trash2, Sheet, Paperclip, X, File as FileIcon } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,7 +35,7 @@ import { useParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const postSchema = z.object({
-  message: z.string().min(1, 'Message cannot be empty.'),
+  message: z.string().optional(),
 });
 
 interface Post {
@@ -43,12 +44,14 @@ interface Post {
   authorName: string;
   content?: string;
   createdAt: any; // Firestore timestamp
-  type?: 'message' | 'lessonPlan' | 'worksheet';
+  type?: 'message' | 'lessonPlan' | 'worksheet' | 'pdf';
   lessonPlanId?: string;
   worksheetId?: string;
   topic?: string;
   subject?: string;
   gradeLevel?: string;
+  fileName?: string;
+  fileUrl?: string;
 }
 
 // Minimal profile types for members list
@@ -72,6 +75,10 @@ export default function ClassroomDetailPage() {
   const [showMembers, setShowMembers] = useState(false);
   const { toast } = useToast();
   const feedRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm({
     resolver: zodResolver(postSchema),
@@ -90,6 +97,8 @@ export default function ClassroomDetailPage() {
         setClassroom(null);
       } else {
         setClassroom(classroomSnap.data());
+        // Fetch members here, after classroom is confirmed to exist
+        fetchMembers(classroomSnap.data());
       }
     } catch (error: any) {
       console.error("Error fetching classroom data:", error);
@@ -109,37 +118,30 @@ export default function ClassroomDetailPage() {
       }
   }, [authLoading, user, fetchClassroomData]);
   
-  // Fetch members after classroom data is loaded
-  useEffect(() => {
-    const fetchMembers = async () => {
-        if (!db || !classroom) return;
-        setMembersLoading(true);
-        
-        try {
-            // Fetch teachers in parallel with students
-            const teacherPromises = (classroom.teacherIds || []).map((id: string) => getDoc(doc(db, 'teachers', id)));
-            const studentPromises = (classroom.studentIds || []).map((id: string) => getDoc(doc(db, 'students', id)));
-
-            const [teacherDocs, studentDocs] = await Promise.all([
-                Promise.all(teacherPromises),
-                Promise.all(studentPromises)
-            ]);
-
-            setTeachers(teacherDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
-            setStudents(studentDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
-            
-        } catch (error) {
-             console.error("Error fetching members:", error);
-             toast({ variant: 'destructive', title: 'Error', description: 'Could not load classroom members list.' });
-        } finally {
-            setMembersLoading(false);
-        }
-    };
+  // Fetch members now receives classroom data directly
+  const fetchMembers = async (classroomData: any) => {
+    if (!db || !classroomData) return;
+    setMembersLoading(true);
     
-    if (classroom) {
-      fetchMembers();
+    try {
+        const teacherPromises = (classroomData.teacherIds || []).map((id: string) => getDoc(doc(db, 'teachers', id)));
+        const studentPromises = (classroomData.studentIds || []).map((id: string) => getDoc(doc(db, 'students', id)));
+
+        const [teacherDocs, studentDocs] = await Promise.all([
+            Promise.all(teacherPromises),
+            Promise.all(studentPromises)
+        ]);
+
+        setTeachers(teacherDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
+        setStudents(studentDocs.filter(d => d.exists()).map(d => ({uid: d.id, ...d.data()} as Member)));
+        
+    } catch (error) {
+         console.error("Error fetching members:", error);
+         toast({ variant: 'destructive', title: 'Error', description: 'Could not load classroom members list.' });
+    } finally {
+        setMembersLoading(false);
     }
-  }, [classroom, db, toast]);
+  };
 
 
   useEffect(() => {
@@ -163,23 +165,67 @@ export default function ClassroomDetailPage() {
     }
   }, [posts]);
 
-  const handlePostMessage = async (values: { message: string }) => {
-    if (!user || !profile || profile.role !== 'teacher' || !db || !classroomId) return;
-
-    try {
-      await addDoc(collection(db, 'classrooms', classroomId, 'posts'), {
-        authorId: user.uid,
-        authorName: profile.name,
-        content: values.message,
-        createdAt: serverTimestamp(),
-        type: 'message',
-      });
-      form.reset();
-    } catch (error) {
-      console.error("Error posting message:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not post message.' });
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast({
+          variant: 'destructive',
+          title: 'File too large',
+          description: 'Please upload a PDF smaller than 10MB.',
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+    if (e.target) {
+      e.target.value = '';
     }
   };
+
+  const handlePostMessage = async (values: { message?: string }) => {
+    if (!user || !profile || profile.role !== 'teacher' || !db || !classroomId) return;
+    if (!values.message && !selectedFile) return;
+
+    setIsUploading(true);
+
+    try {
+      if (selectedFile) {
+        if (!storage) throw new Error("Firebase Storage is not configured.");
+        const file = selectedFile;
+        const fileRef = storageRef(storage, `classrooms/${classroomId}/files/${Date.now()}_${file.name}`);
+        
+        await uploadBytes(fileRef, file);
+        const downloadURL = await getDownloadURL(fileRef);
+
+        await addDoc(collection(db, 'classrooms', classroomId, 'posts'), {
+          authorId: user.uid,
+          authorName: profile.name,
+          content: values.message || '',
+          createdAt: serverTimestamp(),
+          type: 'pdf',
+          fileName: file.name,
+          fileUrl: downloadURL,
+        });
+      } else {
+        await addDoc(collection(db, 'classrooms', classroomId, 'posts'), {
+          authorId: user.uid,
+          authorName: profile.name,
+          content: values.message,
+          createdAt: serverTimestamp(),
+          type: 'message',
+        });
+      }
+      form.reset();
+      setSelectedFile(null);
+    } catch (error) {
+      console.error("Error posting message:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not post your update.' });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
 
   const handleDeletePost = async (postId: string) => {
     if (!db || !user || !classroomId) return;
@@ -213,6 +259,8 @@ export default function ClassroomDetailPage() {
   if (!classroom) {
      return <div className="flex items-center justify-center h-full"><p>Classroom not found.</p></div>;
   }
+
+  const messageValue = form.watch('message');
 
   return (
     <div className="flex flex-col h-full">
@@ -296,6 +344,27 @@ export default function ClassroomDetailPage() {
                                         </div>
                                       </CardContent>
                                     </Card>
+                                ) : post.type === 'pdf' ? (
+                                    <Card className="mt-2 bg-background">
+                                      <CardContent className="p-4">
+                                        {post.content && <p className="text-sm text-foreground mb-3 whitespace-pre-wrap">{post.content}</p>}
+                                        <div className="flex items-center justify-between p-3 border rounded-md">
+                                          <div className="flex items-center gap-3 overflow-hidden">
+                                            <FileIcon className="h-6 w-6 text-primary shrink-0" />
+                                            <div>
+                                              <p className="font-semibold text-sm truncate" title={post.fileName}>{post.fileName}</p>
+                                              <p className="text-xs text-muted-foreground">PDF Document</p>
+                                            </div>
+                                          </div>
+                                          <a href={post.fileUrl} target="_blank" rel="noopener noreferrer">
+                                            <Button size="sm" variant="outline">
+                                              View
+                                              <ArrowRight className="ml-2 h-4 w-4" />
+                                            </Button>
+                                          </a>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
                                 ) : (
                                     <p className="text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
                                 )}
@@ -337,11 +406,40 @@ export default function ClassroomDetailPage() {
                     </CardContent>
                     {profile?.role === 'teacher' && (
                     <CardFooter className="pt-4 border-t">
-                        <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex items-center gap-2">
-                            <Textarea {...form.register('message')} placeholder="Type your message..." className="flex-1" rows={1}/>
-                            <Button type="submit" size="icon" disabled={form.formState.isSubmitting}>
-                            <Send className="h-4 w-4"/>
-                            </Button>
+                        <form onSubmit={form.handleSubmit(handlePostMessage)} className="w-full flex flex-col gap-2">
+                           <div className="flex items-start gap-2">
+                                <Textarea
+                                {...form.register('message')}
+                                placeholder="Type a message or upload a file..."
+                                className="flex-1"
+                                rows={1}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        form.handleSubmit(handlePostMessage)();
+                                    }
+                                }}
+                                />
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".pdf" />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                                    <Paperclip className="h-4 w-4" />
+                                    <span className="sr-only">Attach file</span>
+                                </Button>
+                                <Button type="submit" size="icon" disabled={isUploading || (!messageValue && !selectedFile)}>
+                                    {isUploading ? <LoadingSpinner /> : <Send className="h-4 w-4" />}
+                                </Button>
+                           </div>
+                            {selectedFile && (
+                                <div className="flex items-center justify-between p-2 pl-3 bg-muted rounded-md text-sm">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <FileIcon className="h-4 w-4 text-muted-foreground" />
+                                        <span className="truncate">{selectedFile.name}</span>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedFile(null)} disabled={isUploading}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
                         </form>
                     </CardFooter>
                     )}
@@ -428,5 +526,3 @@ export default function ClassroomDetailPage() {
     </div>
   );
 }
-
-    
