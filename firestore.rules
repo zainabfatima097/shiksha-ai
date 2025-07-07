@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -8,23 +7,22 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/teachers/$(userId));
     }
 
+    // Safely checks if a user is a member (student or teacher) of a classroom.
+    // Verifies document and field existence before checking membership.
     function isClassroomMember(classroomId, userId) {
-      let classroomResource = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      if (classroomResource.data == null) {
-        return false;
-      }
-      let studentIds = classroomResource.data.get('studentIds', []);
-      let teacherIds = classroomResource.data.get('teacherIds', []);
-      return userId in studentIds || userId in teacherIds;
+      return exists(/databases/$(database)/documents/classrooms/$(classroomId))
+        && (
+          ('studentIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data && userId in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.studentIds)
+          || ('teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data && userId in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds)
+        );
     }
     
+    // Safely checks if a user is a teacher of a classroom.
+    // Verifies document and field existence before checking membership.
     function isClassroomTeacher(classroomId, userId) {
-      let classroomResource = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      // Check that classroom and teacherIds list exist
-      if (classroomResource.data == null || !('teacherIds' in classroomResource.data)) {
-        return false;
-      }
-      return userId in classroomResource.data.teacherIds;
+      return exists(/databases/$(database)/documents/classrooms/$(classroomId))
+        && 'teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data
+        && userId in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds;
     }
 
     match /teachers/{teacherId} {
@@ -58,24 +56,9 @@ service cloud.firestore {
                       && request.resource.data.authorId == request.auth.uid
                       && request.resource.data.authorName is string
                       && (
-                        (
-                          request.resource.data.type == 'message' && 
-                          request.resource.data.content is string
-                        ) ||
-                        (
-                          request.resource.data.type == 'lessonPlan' &&
-                          request.resource.data.lessonPlanId is string &&
-                          request.resource.data.topic is string &&
-                          request.resource.data.subject is string
-                        ) ||
-                        (
-                          request.resource.data.type == 'worksheet' &&
-                          request.resource.data.worksheetId is string &&
-                          request.resource.data.gradeLevel is string
-                        ) ||
+                        request.resource.data.type in ['message', 'lessonPlan', 'worksheet'] ||
                         (
                           request.resource.data.type == 'pdf' &&
-                          request.resource.data.content is string &&
                           request.resource.data.fileName is string &&
                           request.resource.data.fileUrl is string
                         )
