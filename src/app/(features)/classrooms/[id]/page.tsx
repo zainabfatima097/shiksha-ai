@@ -166,6 +166,14 @@ export default function ClassroomDetailPage() {
   }, [posts]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (profile?.role !== 'teacher') {
+      toast({
+        variant: 'destructive',
+        title: 'Permission Denied',
+        description: 'Only teachers can upload files.',
+      });
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
       // Explicitly check for PDF file type
