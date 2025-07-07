@@ -2,26 +2,38 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Rules for classroom files
+  
+    // Classroom files: PDFs, etc.
+    // Path: /classrooms/{classroomId}/files/{fileName}
     match /classrooms/{classroomId}/files/{fileName} {
+    
+      // READ: Allow any authenticated user who is a member of the classroom (teacher or student).
+      function isClassroomMember(classroomId) {
+        let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+        // The document must exist to proceed.
+        if (!exists(/databases/$(database)/documents/classrooms/$(classroomId))) {
+          return false;
+        }
+        let classroomData = classroomDoc.data;
+        let isTeacher = 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
+        let isStudent = 'studentIds' in classroomData && request.auth.uid in classroomData.studentIds;
+        return isTeacher || isStudent;
+      }
+    
+      allow read: if request.auth != null && isClassroomMember(classroomId);
 
-      // WRITE: Allow teachers to write to classrooms they are members of.
-      // This is determined by checking if their UID is in the `teacherIds` array of the classroom document.
-      allow write: if request.auth != null &&
-                    exists(/databases/$(database)/documents/classrooms/$(classroomId)) &&
-                    request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds;
-
-      // READ: Allow teachers and students to read files if they are members of the classroom.
-      allow read: if request.auth != null && (
-                    // Teachers can read if they are in the classroom's `teacherIds` list.
-                    (exists(/databases/$(database)/documents/classrooms/$(classroomId)) &&
-                     'teacherIds' in get(/databases/$(database)/documents/classrooms/$(classroomId)).data &&
-                     request.auth.uid in get(/databases/$(database)/documents/classrooms/$(classroomId)).data.teacherIds) ||
-
-                    // Students can read if their profile's `classroomId` matches this classroom.
-                    (exists(/databases/$(database)/documents/students/$(request.auth.uid)) &&
-                     get(/databases/$(database)/documents/students/$(request.auth.uid)).data.classroomId == classroomId)
-                  );
+      // WRITE: Allow only teachers who are members of the classroom.
+      function isClassroomTeacher(classroomId) {
+        let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
+        // The document must exist to proceed.
+        if (!exists(/databases/$(database)/documents/classrooms/$(classroomId))) {
+          return false;
+        }
+        let classroomData = classroomDoc.data;
+        return 'teacherIds' in classroomData && request.auth.uid in classroomData.teacherIds;
+      }
+      
+      allow write: if request.auth != null && isClassroomTeacher(classroomId);
     }
   }
 }
