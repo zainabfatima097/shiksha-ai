@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -80,13 +80,9 @@ export default function LessonPlannerPage() {
     },
   });
 
-  const fetchHistory = useCallback(async (uid: string) => {
-    if (!db) {
-        console.error("Firestore is not initialized. Cannot fetch history.");
-        return;
-    }
-    setIsHistoryLoading(true);
-    try {
+  const refetchHistory = async (uid: string) => {
+    if (!db) return [];
+     try {
         const historyRef = collection(db, 'teachers', uid, 'lessonHistory');
         const q = query(historyRef, orderBy('createdAt', 'desc'), limit(5));
         const querySnapshot = await getDocs(q);
@@ -106,33 +102,59 @@ export default function LessonPlannerPage() {
                 });
             }
         });
-        setHistory(historyData);
-    } catch (error: any) {
-        console.error("Failed to fetch history from database", error);
-        let description = 'Could not load your recent plans. An unknown error occurred.';
-         if (error.code === 'failed-precondition') {
-            description = `A Firestore index is required. Please create it in your Firebase console. The error was: "${error.message}"`;
-        } else if (error.code === 'permission-denied') {
-            description = 'Permission denied. Please check your Firestore security rules to ensure you can read from the "lessonHistory" collection.';
-        }
-        toast({ 
-            variant: 'destructive', 
-            title: 'Error Loading History', 
-            description: description,
-            duration: 9000,
-        });
-    } finally {
-        setIsHistoryLoading(false);
+        return historyData;
+    } catch (error) {
+        console.error("Error refetching history", error);
+        return [];
     }
-  }, [toast]);
+  }
 
   useEffect(() => {
-    if (user && profile?.role === 'teacher') {
-      fetchHistory(user.uid);
-    } else if (!authLoading) {
-      setIsHistoryLoading(false);
+    if (!user || !profile || profile.role !== 'teacher' || !db) {
+        if (!authLoading) {
+            setIsHistoryLoading(false);
+        }
+        return;
     }
-  }, [user, profile, authLoading, fetchHistory]);
+
+    let isMounted = true;
+    setIsHistoryLoading(true);
+
+    const fetchInitialHistory = async () => {
+        try {
+            const historyData = await refetchHistory(user.uid);
+            if (isMounted) {
+                setHistory(historyData);
+            }
+        } catch (error: any) {
+            if (isMounted) {
+                console.error("Failed to fetch history from database", error);
+                let description = 'Could not load your recent plans. An unknown error occurred.';
+                 if (error.code === 'failed-precondition') {
+                    description = `A Firestore index is required. Please create it in your Firebase console. The error was: "${error.message}"`;
+                } else if (error.code === 'permission-denied') {
+                    description = 'Permission denied. Please check your Firestore security rules to ensure you can read from the "lessonHistory" collection.';
+                }
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'Error Loading History', 
+                    description: description,
+                    duration: 9000,
+                });
+            }
+        } finally {
+            if (isMounted) {
+                setIsHistoryLoading(false);
+            }
+        }
+    };
+    
+    fetchInitialHistory();
+
+    return () => {
+        isMounted = false;
+    };
+  }, [user, profile, authLoading, toast]);
 
 
   async function onSubmit(values: LessonPlannerFormValues) {
@@ -159,7 +181,8 @@ export default function LessonPlannerPage() {
             weeklyPlan: result.weeklyPlan,
             createdAt: serverTimestamp()
         });
-        await fetchHistory(user.uid);
+        const newHistory = await refetchHistory(user.uid);
+        setHistory(newHistory);
       } catch (historyError: any) {
         console.error("Failed to save lesson plan history:", historyError);
         toast({
@@ -202,7 +225,8 @@ export default function LessonPlannerPage() {
         await addDoc(historyRef, historyData);
         
         setLessonPlan(editedLessonPlan);
-        await fetchHistory(user.uid);
+        const newHistory = await refetchHistory(user.uid);
+        setHistory(newHistory);
         toast({ title: "Success", description: "Lesson plan updated and saved to history." });
     } catch (error) {
         console.error("Error saving edited lesson plan:", error);

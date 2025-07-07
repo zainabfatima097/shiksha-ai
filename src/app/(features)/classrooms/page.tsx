@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
 import { collection, doc, getDocs, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
@@ -28,39 +28,52 @@ export default function ClassroomsPage() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchClassrooms = useCallback(async () => {
-    if (!db) return;
+  useEffect(() => {
+    if (authLoading || !db) {
+      return;
+    }
+    
+    let isMounted = true;
     setLoading(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, 'classrooms'));
-      const classroomsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
-      setClassrooms(classroomsData);
 
-      if (profile?.role === 'teacher' && user) {
-        const teacherDoc = await getDoc(doc(db, 'teachers', user.uid));
-        if (teacherDoc.exists()) {
-          setJoinedClassrooms(teacherDoc.data().classroomIds || []);
+    const fetchClassrooms = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'classrooms'));
+        if (isMounted) {
+          const classroomsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Classroom));
+          setClassrooms(classroomsData);
+        }
+
+        if (profile?.role === 'teacher' && user) {
+          const teacherDoc = await getDoc(doc(db, 'teachers', user.uid));
+          if (teacherDoc.exists() && isMounted) {
+            setJoinedClassrooms(teacherDoc.data().classroomIds || []);
+          }
+        }
+      } catch (error: any) {
+        console.error("Error fetching classrooms:", error);
+        let description = 'Could not load classrooms.';
+        if (error.code === 'permission-denied') {
+          description = "You don't have permission to view classrooms. Please check your Firestore security rules.";
+        } else if (error.code === 'failed-precondition') {
+          description = `A Firestore index is required for this query. Please create it in your Firebase console. The error was: "${error.message}"`;
+        }
+        if(isMounted) {
+            toast({ variant: 'destructive', title: 'Error Loading Classrooms', description, duration: 9000 });
+        }
+      } finally {
+        if(isMounted) {
+            setLoading(false);
         }
       }
-    } catch (error: any) {
-      console.error("Error fetching classrooms:", error);
-      let description = 'Could not load classrooms.';
-      if (error.code === 'permission-denied') {
-        description = "You don't have permission to view classrooms. Please check your Firestore security rules.";
-      } else if (error.code === 'failed-precondition') {
-        description = `A Firestore index is required for this query. Please create it in your Firebase console. The error was: "${error.message}"`;
-      }
-      toast({ variant: 'destructive', title: 'Error Loading Classrooms', description, duration: 9000 });
-    } finally {
-      setLoading(false);
-    }
-  }, [profile?.role, user, toast]);
+    };
+    
+    fetchClassrooms();
 
-  useEffect(() => {
-    if (!authLoading) {
-      fetchClassrooms();
+    return () => {
+        isMounted = false;
     }
-  }, [authLoading, fetchClassrooms]);
+  }, [authLoading, profile, user, toast]);
 
   const handleJoinLeave = async (classroomId: string, isJoined: boolean) => {
     if (!user || !db || profile?.role !== 'teacher') return;
