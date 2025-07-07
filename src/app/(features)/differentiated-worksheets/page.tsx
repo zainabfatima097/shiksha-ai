@@ -8,6 +8,7 @@ import * as z from 'zod';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -259,7 +260,7 @@ export default function DifferentiatedWorksheetsPage() {
                           <AccordionContent>
                             <div ref={el => contentRefs.current[index] = el} className="p-4 bg-background rounded-md border">
                                 <div className="prose prose-sm max-w-none dark:prose-invert">
-                                    <ReactMarkdown>{ws.worksheetContent}</ReactMarkdown>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{ws.worksheetContent}</ReactMarkdown>
                                 </div>
                             </div>
                           </AccordionContent>

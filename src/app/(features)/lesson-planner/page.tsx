@@ -18,6 +18,7 @@ import { generateLessonPlan, LessonPlanHistoryItem, LessonPlanInput } from '@/ai
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Carousel,
   CarouselContent,
@@ -590,7 +591,7 @@ export default function LessonPlannerPage() {
                                     />
                                 ) : (
                                     <div className="prose prose-sm max-w-none dark:prose-invert">
-                                        <ReactMarkdown>{lessonPlan}</ReactMarkdown>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{lessonPlan}</ReactMarkdown>
                                     </div>
                                 )}
                             </CardContent>

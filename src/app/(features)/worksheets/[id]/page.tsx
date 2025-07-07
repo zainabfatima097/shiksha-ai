@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Sheet } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Worksheet {
@@ -133,7 +134,7 @@ export default function WorksheetViewerPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <ReactMarkdown>{worksheet.worksheetContent}</ReactMarkdown>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{worksheet.worksheetContent}</ReactMarkdown>
                         </div>
                     </CardContent>
                 </Card>
