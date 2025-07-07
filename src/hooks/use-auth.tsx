@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useMemo } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, isFirebaseConfigured, db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -133,7 +133,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <MissingConfigMessage />;
   }
 
-  return <AuthContext.Provider value={{ user, profile, loading, classrooms, setProfile }}>{children}</AuthContext.Provider>;
+  const authContextValue = useMemo(() => ({
+    user,
+    profile,
+    loading,
+    classrooms,
+    setProfile
+  }), [user, profile, loading, classrooms, setProfile]);
+
+  return <AuthContext.Provider value={authContextValue}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
