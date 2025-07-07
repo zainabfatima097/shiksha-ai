@@ -4,88 +4,105 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Helper Functions ---
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
     function isTeacher(userId) {
       return exists(/databases/$(database)/documents/teachers/$(userId));
     }
-    
-    function isStudent(userId) {
-      return exists(/databases/$(database)/documents/students/$(userId));
-    }
-    
-    function isTeacherInClassroom(classroomId, userId) {
-      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      return 'teacherIds' in classroomDoc.data && userId in classroomDoc.data.teacherIds;
-    }
-    
-    function isStudentInClassroom(classroomId, userId) {
-      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      return 'studentIds' in classroomDoc.data && userId in classroomDoc.data.studentIds;
-    }
 
     function isClassroomMember(classroomId, userId) {
-      return isTeacherInClassroom(classroomId, userId) || isStudentInClassroom(classroomId, userId);
+      let classroomResource = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      if (classroomResource.data == null) {
+        return false;
+      }
+      let studentIds = classroomResource.data.get('studentIds', []);
+      let teacherIds = classroomResource.data.get('teacherIds', []);
+      return userId in studentIds || userId in teacherIds;
     }
     
-    // --- User Profiles ---
+    function isClassroomTeacher(classroomId, userId) {
+      let classroomResource = get(/databases/$(database)/documents/classrooms/$(classroomId));
+      // Check that classroom and teacherIds list exist
+      if (classroomResource.data == null || !('teacherIds' in classroomResource.data)) {
+        return false;
+      }
+      return userId in classroomResource.data.teacherIds;
+    }
+
     match /teachers/{teacherId} {
-      // Any authenticated user can read public teacher info.
-      allow read: if isAuthenticated();
-      // Only the user themselves can create or update their own profile.
-      allow create, update: if request.auth.uid == teacherId;
+      allow read: if true;
+      allow create: if (request.auth.uid == teacherId) || (request.auth == null);
+      allow update: if request.auth.uid == teacherId;
+      allow delete: if request.auth == null;
+
+      match /lessonHistory/{docId} {
+        allow read, create: if request.auth.uid == teacherId;
+      }
     }
 
     match /students/{studentId} {
-      // Any authenticated user can read public student info.
-      allow read: if isAuthenticated();
-      // Only the user themselves can create their profile.
-      allow create: if request.auth.uid == studentId;
-      // Students cannot update their own profile in this app.
-      allow update: if false;
-    }
-
-    // --- Classrooms ---
-    match /classrooms/{classroomId} {
-      // Teachers can read all classrooms to see a list to join.
-      // Students can only read the classroom they are assigned to.
-      allow read: if isAuthenticated() && (isTeacher(request.auth.uid) || 
-                  (isStudent(request.auth.uid) && get(/databases/$(database)/documents/students/$(request.auth.uid)).data.classroomId == classroomId));
-      
-      // Teachers can create a classroom (implicitly via student signup) or join one.
-      allow create, update: if isAuthenticated() && isTeacher(request.auth.uid);
-    }
-
-    // --- Classroom Posts ---
-    match /classrooms/{classroomId}/posts/{postId} {
-      // Only members of the classroom can read posts.
-      allow read: if isAuthenticated() && isClassroomMember(classroomId, request.auth.uid);
-      
-      // Only teachers in the classroom can create posts.
-      allow create: if isAuthenticated() && isTeacher(request.auth.uid) && isTeacherInClassroom(classroomId, request.auth.uid);
-      
-      // Only the author of the post (who must be a teacher) can delete it.
-      allow delete: if isAuthenticated() && isTeacher(request.auth.uid) && resource.data.authorId == request.auth.uid;
-    }
-
-    // --- Shared Content ---
-    match /lessonPlans/{lessonPlanId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isTeacher(request.auth.uid);
-    }
-
-    match /worksheets/{worksheetId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isTeacher(request.auth.uid);
+       allow read: if true;
+       allow create: if (request.auth.uid == studentId) || (request.auth == null);
+       allow update: if request.auth.uid == studentId;
+       allow delete: if request.auth == null;
     }
     
-    // --- Teacher-Specific Subcollections ---
-    match /teachers/{teacherId}/lessonHistory/{historyId} {
-      // A teacher can only access their own lesson plan history.
-      allow read, write: if request.auth.uid == teacherId;
+    match /classrooms/{classroomId} {
+      allow list: if request.auth != null;
+      allow get: if (request.auth != null && isClassroomMember(classroomId, request.auth.uid)) || (request.auth == null);
+      allow create, update: if (request.auth != null && isTeacher(request.auth.uid)) || request.auth == null;
+    }
+
+    match /classrooms/{classroomId}/posts/{postId} {
+      allow read: if (request.auth != null && isClassroomMember(classroomId, request.auth.uid)) || (request.auth == null);
+      allow create: if request.auth != null 
+                      && isClassroomTeacher(classroomId, request.auth.uid)
+                      && request.resource.data.authorId == request.auth.uid
+                      && request.resource.data.authorName is string
+                      && (
+                        (
+                          request.resource.data.type == 'message' && 
+                          request.resource.data.content is string
+                        ) ||
+                        (
+                          request.resource.data.type == 'lessonPlan' &&
+                          request.resource.data.lessonPlanId is string &&
+                          request.resource.data.topic is string &&
+                          request.resource.data.subject is string
+                        ) ||
+                        (
+                          request.resource.data.type == 'worksheet' &&
+                          request.resource.data.worksheetId is string &&
+                          request.resource.data.gradeLevel is string
+                        ) ||
+                        (
+                          request.resource.data.type == 'pdf' &&
+                          request.resource.data.content is string &&
+                          request.resource.data.fileName is string &&
+                          request.resource.data.fileUrl is string
+                        )
+                      );
+      allow delete: if request.auth != null && resource.data.authorId == request.auth.uid && isClassroomTeacher(classroomId, request.auth.uid);
+    }
+    
+    match /lessonPlans/{lessonPlanId} {
+      allow read: if true;
+      allow create: if request.auth != null 
+                      && isTeacher(request.auth.uid)
+                      && request.resource.data.authorId == request.auth.uid
+                      && request.resource.data.authorName is string
+                      && request.resource.data.topic is string
+                      && request.resource.data.subject is string
+                      && request.resource.data.gradeLevel is string
+                      && request.resource.data.weeklyPlan is string;
+    }
+    
+    match /worksheets/{worksheetId} {
+      allow read: if true;
+      allow create: if request.auth != null 
+                      && isTeacher(request.auth.uid)
+                      && request.resource.data.authorId == request.auth.uid
+                      && request.resource.data.authorName is string
+                      && request.resource.data.gradeLevel is string
+                      && request.resource.data.worksheetContent is string;
     }
   }
 }
