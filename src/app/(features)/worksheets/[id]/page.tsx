@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -55,6 +54,7 @@ const WorksheetSkeleton = () => (
 
 export default function WorksheetViewerPage() {
     const params = useParams();
+    const worksheetId = params.id as string;
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
     const [worksheet, setWorksheet] = useState<Worksheet | null>(null);
@@ -63,7 +63,6 @@ export default function WorksheetViewerPage() {
     useEffect(() => {
         if (authLoading || !user || !db) return;
         
-        const worksheetId = params.id as string;
         if (!worksheetId) {
             setLoading(false);
             return;
@@ -88,7 +87,7 @@ export default function WorksheetViewerPage() {
         };
 
         fetchWorksheet();
-    }, [params.id, user, authLoading]);
+    }, [worksheetId, user, authLoading]);
 
     if (authLoading || loading) {
         return <WorksheetSkeleton />;

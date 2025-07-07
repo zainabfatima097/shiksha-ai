@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -57,6 +56,7 @@ const LessonPlanSkeleton = () => (
 
 export default function LessonPlanViewerPage() {
     const params = useParams();
+    const lessonPlanId = params.id as string;
     const router = useRouter();
     const { user, loading: authLoading } = useAuth();
     const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
@@ -65,7 +65,6 @@ export default function LessonPlanViewerPage() {
     useEffect(() => {
         if (authLoading || !user || !db) return;
         
-        const lessonPlanId = params.id as string;
         if (!lessonPlanId) {
             setLoading(false);
             return;
@@ -90,7 +89,7 @@ export default function LessonPlanViewerPage() {
         };
 
         fetchLessonPlan();
-    }, [params.id, user, authLoading]);
+    }, [lessonPlanId, user, authLoading]);
 
     if (authLoading || loading) {
         return <LessonPlanSkeleton />;
