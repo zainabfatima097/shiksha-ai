@@ -168,6 +168,16 @@ export default function ClassroomDetailPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Explicitly check for PDF file type
+      if (file.type !== 'application/pdf') {
+        toast({
+          variant: 'destructive',
+          title: 'Invalid File Type',
+          description: 'Please select a PDF file.',
+        });
+        return;
+      }
+      
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
         toast({
           variant: 'destructive',
@@ -176,6 +186,7 @@ export default function ClassroomDetailPage() {
         });
         return;
       }
+      
       setSelectedFile(file);
     }
     if (e.target) {
@@ -420,7 +431,7 @@ export default function ClassroomDetailPage() {
                                     }
                                 }}
                                 />
-                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".pdf" />
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="application/pdf" />
                                 <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                                     <Paperclip className="h-4 w-4" />
                                     <span className="sr-only">Attach file</span>
