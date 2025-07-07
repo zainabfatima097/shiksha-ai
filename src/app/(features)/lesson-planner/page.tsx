@@ -355,7 +355,7 @@ export default function LessonPlannerPage() {
   return (
     <div className="flex flex-col h-full">
        <header className="flex items-center justify-between p-4 border-b md:hidden">
-            <h1 className="font-headline text-xl font-bold text-primary">Lesson Planner</h1>
+            <h1 className="font-headline text-xl font-bold text-primary truncate">Lesson Planner</h1>
             <SidebarTrigger />
         </header>
       <div className="flex-1 p-4 md:p-8 overflow-auto">
@@ -372,7 +372,7 @@ export default function LessonPlannerPage() {
                 <Carousel opts={{ align: "start", loop: false, dragFree: true }} className="w-full">
                     <CarouselContent className="-ml-2">
                     {history.map((item, index) => (
-                        <CarouselItem key={index} className="pl-2 md:basis-1/2 lg:basis-1/3">
+                        <CarouselItem key={index} className="pl-2 basis-11/12 md:basis-1/2 lg:basis-1/3">
                         <div className="p-1">
                             <Card
                             className="bg-primary/10 hover:bg-primary/20 cursor-pointer transition-colors h-full"
@@ -399,11 +399,11 @@ export default function LessonPlannerPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-8 items-start">
               <Card className="lg:col-span-1">
-                  <CardHeader>
+                  <CardHeader className="p-4 md:p-6">
                   <CardTitle className="font-headline text-2xl">AI Lesson Planner</CardTitle>
                   <CardDescription>Generate a detailed weekly lesson plan for your class.</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
                   <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -528,7 +528,7 @@ export default function LessonPlannerPage() {
                   {!isLoading && lessonPlan && (
                       <div ref={lessonPlanRef}>
                         <Card className="w-full bg-secondary/50 max-h-[calc(100vh-8rem)] overflow-y-auto">
-                            <CardHeader>
+                            <CardHeader className="p-4 md:p-6">
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="font-headline text-xl">Your Weekly Lesson Plan</CardTitle>
                                     <div className="flex items-center gap-1">
@@ -604,7 +604,7 @@ export default function LessonPlannerPage() {
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-4 md:p-6">
                                 {isEditing ? (
                                     <Textarea 
                                         value={editedLessonPlan}
@@ -614,7 +614,7 @@ export default function LessonPlannerPage() {
                                         disabled={isLoading}
                                     />
                                 ) : (
-                                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-x-auto">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{lessonPlan}</ReactMarkdown>
                                     </div>
                                 )}
