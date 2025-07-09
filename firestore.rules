@@ -1,74 +1,57 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
     function isTeacher(userId) {
       return exists(/databases/$(database)/documents/teachers/$(userId));
     }
 
-    function isClassroomMember(classroomId) {
-      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      return request.auth != null && (
-        (classroomDoc.data.teacherIds != null && request.auth.uid in classroomDoc.data.teacherIds) ||
-        (classroomDoc.data.studentIds != null && request.auth.uid in classroomDoc.data.studentIds)
-      );
-    }
-
-    function isClassroomTeacher(classroomId) {
-      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      return request.auth != null && (classroomDoc.data.teacherIds != null && request.auth.uid in classroomDoc.data.teacherIds);
-    }
-
-    // Teachers collection
-    match /teachers/{teacherId} {
-      // Allow creation during signup
-      allow create;
-      // Allow any authenticated user to read teacher info (e.g., for classroom member lists)
-      allow read: if request.auth != null;
-      // Only the teacher can update their own profile
-      allow update: if request.auth != null && request.auth.uid == teacherId;
-    }
-
-    // Students collection
-    match /students/{studentId} {
-      // Allow creation during signup or by admin panel
-      allow create;
-      // Allow any authenticated user to read student info
-      allow read: if request.auth != null;
-      // Only the student can update their own profile
-      allow update: if request.auth != null && request.auth.uid == studentId;
-    }
-
-    // Classrooms collection
     match /classrooms/{classroomId} {
-      // Allow creation for admin panel
-      allow create;
-      // Allow teachers to join/leave classrooms
-      allow update: if isTeacher(request.auth.uid);
+      allow read: if request.auth != null;
+      // Admin panel can create classrooms when adding the first student.
+      allow create: if true;
+      // Allow updates from teachers (joining/leaving) and from the unauthenticated admin panel.
+      // NOTE: `request.auth == null` is for the dev-only admin panel.
+      allow update: if (request.auth != null && isTeacher(request.auth.uid)) || request.auth == null;
 
-      // Students and teachers of a class can read its details
-      allow read: if isClassroomMember(classroomId);
+      match /posts/{postId} {
+        allow read: if request.auth != null;
+        allow create, delete: if request.auth != null && isTeacher(request.auth.uid);
+      }
     }
 
-    // Classroom posts (feed)
-    match /classrooms/{classroomId}/posts/{postId} {
-      allow read: if isClassroomMember(classroomId);
-      // Teachers can create posts
-      allow create: if isClassroomTeacher(classroomId);
-      // Only the author of the post (who must be a teacher) can delete it
-      allow delete: if isClassroomTeacher(classroomId) && resource.data.authorId == request.auth.uid;
+    match /teachers/{teacherId} {
+      // Authenticated users can read a specific teacher's document.
+      allow get: if request.auth != null;
+      // The admin panel (unauthenticated) can list and create teachers.
+      allow list, create: if true;
+      // Teachers can only update their own document.
+      allow update: if request.auth != null && request.auth.uid == teacherId;
+      // The admin panel can delete any user marked as 'dev_generated'.
+      allow delete: if resource.data.dev_generated == true;
+    }
+    
+    match /students/{studentId} {
+      // Authenticated users can read a specific student's document.
+      allow get: if request.auth != null;
+      // The admin panel (unauthenticated) can list and create students.
+      allow list, create: if true;
+      // Students can only update their own document.
+      allow update: if request.auth != null && request.auth.uid == studentId;
+      // The admin panel can delete any user marked as 'dev_generated'.
+      allow delete: if resource.data.dev_generated == true;
     }
 
-    // Shared resources that are created by teachers
     match /lessonPlans/{lessonPlanId} {
       allow read: if request.auth != null;
-      allow create: if isTeacher(request.auth.uid);
+      allow create: if request.auth != null && isTeacher(request.auth.uid);
     }
+
     match /worksheets/{worksheetId} {
-      allow read: if request.auth != null;
-      allow create: if isTeacher(request.auth.uid);
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && isTeacher(request.auth.uid);
     }
   }
 }
