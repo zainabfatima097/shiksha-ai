@@ -1,16 +1,20 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, BookText } from 'lucide-react';
+import { ArrowLeft, BookText, Edit } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner } from '@/components/loading-spinner';
 
 interface LessonPlan {
     id: string;
@@ -18,6 +22,7 @@ interface LessonPlan {
     subject: string;
     gradeLevel: string;
     weeklyPlan: string;
+    authorId: string;
     authorName: string;
     createdAt: any;
 }
@@ -58,9 +63,13 @@ export default function LessonPlanViewerPage() {
     const params = useParams();
     const lessonPlanId = params.id as string;
     const router = useRouter();
-    const { user, loading: authLoading } = useAuth();
+    const { user, profile, loading: authLoading } = useAuth();
     const [lessonPlan, setLessonPlan] = useState<LessonPlan | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedPlan, setEditedPlan] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const { toast } = useToast();
 
     useEffect(() => {
         if (authLoading || !user || !db) return;
@@ -77,19 +86,51 @@ export default function LessonPlanViewerPage() {
                 const lessonPlanSnap = await getDoc(lessonPlanRef);
 
                 if (lessonPlanSnap.exists()) {
-                    setLessonPlan({ id: lessonPlanSnap.id, ...lessonPlanSnap.data() } as LessonPlan);
+                    const data = lessonPlanSnap.data();
+                    setLessonPlan({ id: lessonPlanSnap.id, ...data } as LessonPlan);
+                    setEditedPlan(data.weeklyPlan || '');
                 } else {
                     console.log('No such document!');
+                    toast({ variant: "destructive", title: "Not Found", description: "Lesson plan not found."});
                 }
             } catch (error) {
                 console.error("Error fetching lesson plan:", error);
+                toast({ variant: "destructive", title: "Error", description: "Could not load the lesson plan."});
             } finally {
                 setLoading(false);
             }
         };
 
         fetchLessonPlan();
-    }, [lessonPlanId, user, authLoading]);
+    }, [lessonPlanId, user, authLoading, toast]);
+    
+    const handleSave = async () => {
+        if (!lessonPlanId || !db) return;
+        setIsSaving(true);
+        try {
+            const lessonPlanRef = doc(db, 'lessonPlans', lessonPlanId);
+            await updateDoc(lessonPlanRef, {
+                weeklyPlan: editedPlan
+            });
+
+            if (lessonPlan) {
+                setLessonPlan({ ...lessonPlan, weeklyPlan: editedPlan });
+            }
+            
+            setIsEditing(false);
+            toast({ title: "Success", description: "Lesson plan updated." });
+
+        } catch (error: any) {
+            console.error("Error updating lesson plan:", error);
+            let description = 'Could not save the lesson plan.';
+            if (error.code === 'permission-denied') {
+              description = "You don't have permission to edit this lesson plan. Please check Firestore rules.";
+            }
+            toast({ variant: "destructive", title: "Update Error", description, duration: 9000 });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     if (authLoading || loading) {
         return <LessonPlanSkeleton />;
@@ -108,6 +149,8 @@ export default function LessonPlanViewerPage() {
             </div>
         );
     }
+    
+    const canEdit = user?.uid === lessonPlan?.authorId && profile?.role === 'teacher';
 
     return (
         <div className="flex-1 p-4 md:p-8 overflow-auto">
@@ -131,15 +174,39 @@ export default function LessonPlanViewerPage() {
                                     Shared by {lessonPlan.authorName} on {new Date(lessonPlan.createdAt?.toDate()).toLocaleDateString()}
                                 </CardDescription>
                              </div>
+                             {canEdit && !isEditing && (
+                                <Button variant="ghost" size="icon" onClick={() => setIsEditing(true)}>
+                                    <Edit className="h-5 w-5" />
+                                </Button>
+                             )}
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{lessonPlan.weeklyPlan}</ReactMarkdown>
-                        </div>
+                        {isEditing ? (
+                            <div className="space-y-4">
+                                <Textarea 
+                                    value={editedPlan}
+                                    onChange={(e) => setEditedPlan(e.target.value)}
+                                    rows={25}
+                                    className="font-mono text-sm"
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" onClick={() => setIsEditing(false)} disabled={isSaving}>Cancel</Button>
+                                    <Button onClick={handleSave} disabled={isSaving}>
+                                        {isSaving && <LoadingSpinner className="mr-2 h-4 w-4" />}
+                                        Save
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="prose prose-sm max-w-none dark:prose-invert">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{lessonPlan.weeklyPlan}</ReactMarkdown>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
         </div>
     );
 }
+
