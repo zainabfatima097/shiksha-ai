@@ -1,121 +1,71 @@
-rules_version = '2';
 
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper Functions
-    function isAuth() {
+  
+    // --- Helper Functions ---
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isUser(userId) {
-      return isAuth() && request.auth.uid == userId;
-    }
-    
-    function isTeacher(userId) {
-      return exists(/databases/$(database)/documents/teachers/$(userId));
-    }
-    
-    function isStudent(userId) {
-      return exists(/databases/$(database)/documents/students/$(userId));
+    function isTeacher() {
+      // Check if a document for the user exists in the teachers collection.
+      return isAuthenticated() && exists(/databases/$(database)/documents/teachers/$(request.auth.uid));
     }
 
-    function isClassroomTeacher(classroomId, userId) {
-      let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-      // Safely check if teacherIds property exists and if the user is in it.
-      return 'teacherIds' in classroomDoc.data && userId in classroomDoc.data.teacherIds;
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isClassroomMember(classroomId, userId) {
-        let classroomDoc = get(/databases/$(database)/documents/classrooms/$(classroomId));
-        // Safely check properties before accessing them.
-        let teacherIds = classroomDoc.data.get('teacherIds', []);
-        let studentIds = classroomDoc.data.get('studentIds', []);
-        return userId in teacherIds || userId in studentIds;
-    }
-    
-    // Rules for User Profiles (Teachers & Students)
+    // --- Collection Rules ---
+
+    // A user can create their own profile. Only they can update it. Anyone authenticated can read it.
     match /teachers/{teacherId} {
-      // Anyone can read teacher profiles
-      allow read: if true;
-      // Users can create their own teacher profile, or admin can create them
-      allow create: if isUser(teacherId) || request.auth == null;
-      // Teachers can update their own profile
-      allow update: if isUser(teacherId);
-      // Only admin can delete
-      allow delete: if request.auth == null;
-
-      // Teachers can manage their own lesson history
-      match /lessonHistory/{docId} {
-        allow read, create: if isUser(teacherId);
-      }
+      allow read: if isAuthenticated();
+      allow create: if isOwner(teacherId);
+      allow update: if isOwner(teacherId);
+      allow delete: if false; 
     }
 
     match /students/{studentId} {
-       // Anyone can read student profiles (e.g. for classroom member lists)
-       allow read: if true;
-       // Users can create their own student profile, or admin can create them
-       allow create: if isUser(studentId) || request.auth == null;
-       // Students can update their own profile (future feature)
-       allow update: if isUser(studentId);
-       // Only admin can delete
-       allow delete: if request.auth == null;
-    }
-    
-    // Rules for Classrooms
-    match /classrooms/{classroomId} {
-      // Any authenticated user can list available classrooms
-      allow list: if isAuth();
-      // Only members of the classroom can view its details
-      allow get: if isAuth() && isClassroomMember(classroomId, request.auth.uid);
-      // Only teachers can create or update classrooms (e.g., joining/leaving)
-      allow create, update: if isAuth() && isTeacher(request.auth.uid);
+      allow read: if isAuthenticated();
+      allow create: if isOwner(studentId);
+      allow update: if false;
+      allow delete: if false;
     }
 
-    // Rules for Classroom Posts
+    // Classrooms
+    match /classrooms/{classroomId} {
+      // Anyone authenticated can view classrooms (to join, or because they are a member)
+      allow read: if isAuthenticated(); 
+      
+      // Teachers can update classrooms (join/leave). Anyone can create one on signup.
+      allow create: if isAuthenticated();
+      allow update: if isTeacher();
+    }
+    
+    // Classroom posts
     match /classrooms/{classroomId}/posts/{postId} {
-      // Any classroom member can read posts
-      allow read: if isAuth() && isClassroomMember(classroomId, request.auth.uid);
-      // Only a teacher in that specific classroom can create a post
-      allow create: if isAuth()
-                      && isClassroomTeacher(classroomId, request.auth.uid)
-                      && request.resource.data.authorId == request.auth.uid
-                      && request.resource.data.authorName is string
-                      && (
-                        (request.resource.data.type == 'message' && request.resource.data.content is string)
-                        || (request.resource.data.type == 'lessonPlan' && request.resource.data.lessonPlanId is string)
-                        || (request.resource.data.type == 'worksheet' && request.resource.data.worksheetId is string)
-                        || ((request.resource.data.type == 'pdf' || request.resource.data.type == 'image') && request.resource.data.fileName is string && request.resource.data.fileUrl is string)
-                      );
-      // Only the author of the post, who must also be a teacher in the class, can delete it.
-      allow delete: if isAuth() && resource.data.authorId == request.auth.uid && isClassroomTeacher(classroomId, request.auth.uid);
+        // Anyone authenticated can read posts (access is controlled by UI).
+        allow read: if isAuthenticated();
+        // Only teachers can create posts.
+        allow create: if isTeacher();
+        // The author can delete their post.
+        allow delete: if isTeacher() && request.auth.uid == resource.data.authorId;
+        allow update: if false;
     }
-    
-    // Rules for Shared Content (Lesson Plans & Worksheets)
+
+    // Lesson plans and worksheets
     match /lessonPlans/{lessonPlanId} {
-      // Anyone authenticated can view a shared lesson plan
-      allow read: if isAuth();
-      // Only a teacher can create a lesson plan, with correct data fields
-      allow create: if isAuth()
-                      && isTeacher(request.auth.uid)
-                      && request.resource.data.authorId == request.auth.uid
-                      && request.resource.data.authorName is string
-                      && request.resource.data.topic is string
-                      && request.resource.data.subject is string
-                      && request.resource.data.gradeLevel is string
-                      && request.resource.data.weeklyPlan is string;
+      allow read: if isAuthenticated();
+      allow create: if isTeacher();
+      allow update, delete: if false;
     }
-    
+
     match /worksheets/{worksheetId} {
-      // Anyone authenticated can view a shared worksheet
-      allow read: if isAuth();
-      // Only a teacher can create a worksheet, with correct data fields
-      allow create: if isAuth()
-                      && isTeacher(request.auth.uid)
-                      && request.resource.data.authorId == request.auth.uid
-                      && request.resource.data.authorName is string
-                      && request.resource.data.gradeLevel is string
-                      && request.resource.data.worksheetContent is string;
+      allow read: if isAuthenticated();
+      allow create: if isTeacher();
+      allow update, delete: if false;
     }
   }
 }
