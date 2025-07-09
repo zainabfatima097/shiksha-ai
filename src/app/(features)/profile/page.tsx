@@ -2,13 +2,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,7 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Terminal, Edit } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Terminal, Edit, BookText, ArrowRight } from 'lucide-react';
 
 const profileUpdateSchema = z.object({
     class: z.string().optional(),
@@ -25,11 +27,20 @@ const profileUpdateSchema = z.object({
 
 type ProfileUpdateFormValues = z.infer<typeof profileUpdateSchema>;
 
+interface LessonPlan {
+    id: string;
+    topic: string;
+    subject: string;
+    gradeLevel: string;
+    createdAt: any;
+}
 
 export default function ProfilePage() {
     const { user, profile, setProfile, loading: authLoading } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(true);
     const { toast } = useToast();
 
     const form = useForm<ProfileUpdateFormValues>({
@@ -45,8 +56,43 @@ export default function ProfilePage() {
         }
     }, [profile, form, isEditing]);
 
+    useEffect(() => {
+        if (profile?.role === 'teacher' && user && db) {
+            const fetchHistory = async () => {
+                setHistoryLoading(true);
+                try {
+                    const q = query(
+                        collection(db, 'lessonPlans'), 
+                        where('authorId', '==', user.uid),
+                        orderBy('createdAt', 'desc')
+                    );
+                    const querySnapshot = await getDocs(q);
+                    const plans = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LessonPlan));
+                    setLessonPlans(plans);
+                } catch (error: any) {
+                    console.error("Error fetching lesson plan history:", error);
+                     let description = "Could not load your lesson plan history.";
+                     if (error.code === 'failed-precondition') {
+                        description = `A Firestore index is required for this query. Please check the browser console for a link to create it, then try again.`;
+                    }
+                    toast({
+                        variant: 'destructive',
+                        title: 'Error',
+                        description,
+                        duration: 9000,
+                    });
+                } finally {
+                    setHistoryLoading(false);
+                }
+            };
+            fetchHistory();
+        } else {
+            setHistoryLoading(false);
+        }
+    }, [user, profile, toast]);
+
     async function onSubmit(values: ProfileUpdateFormValues) {
-        if (!user || profile?.role !== 'teacher') return;
+        if (!user || profile?.role !== 'teacher' || !db) return;
         setIsUpdating(true);
         try {
             const teacherRef = doc(db, 'teachers', user.uid);
@@ -208,6 +254,52 @@ export default function ProfilePage() {
                             </Form>
                         )}
                     </CardContent>
+                    {profile?.role === 'teacher' && (
+                        <CardFooter className="pt-0">
+                             <Card className="w-full mt-6">
+                                <CardHeader>
+                                    <div className="flex items-center gap-3">
+                                        <BookText className="h-6 w-6 text-primary" />
+                                        <div>
+                                            <CardTitle className="font-headline text-xl">Lesson Plan History</CardTitle>
+                                            <CardDescription>A list of lesson plans you have created.</CardDescription>
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    {historyLoading ? (
+                                        <div className="space-y-3">
+                                            <Skeleton className="h-16 w-full" />
+                                            <Skeleton className="h-16 w-full" />
+                                            <Skeleton className="h-16 w-full" />
+                                        </div>
+                                    ) : lessonPlans.length > 0 ? (
+                                        <ul className="space-y-3">
+                                            {lessonPlans.map((plan) => (
+                                                <li key={plan.id}>
+                                                    <Link href={`/lesson-plans/${plan.id}`} passHref className="block p-4 border rounded-lg hover:bg-muted transition-colors">
+                                                        <div className="flex justify-between items-center">
+                                                            <div>
+                                                                <p className="font-semibold">{plan.topic}</p>
+                                                                <p className="text-sm text-muted-foreground">
+                                                                    {plan.subject} | Grade {plan.gradeLevel} | {new Date(plan.createdAt?.toDate()).toLocaleDateString()}
+                                                                </p>
+                                                            </div>
+                                                            <ArrowRight className="h-5 w-5 text-muted-foreground shrink-0 ml-4" />
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground text-center py-4">
+                                            You have not created any lesson plans yet.
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </CardFooter>
+                    )}
                 </Card>
             </div>
         </div>
