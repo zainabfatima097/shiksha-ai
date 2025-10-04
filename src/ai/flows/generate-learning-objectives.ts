@@ -1,24 +1,23 @@
+
 'use server';
 /**
  * @fileOverview Flow for generating learning objectives for a lesson plan.
  *
  * - generateLearningObjectives - A function that generates learning objectives based on a topic and grade level.
- * - GenerateLearningObjectivesInput - The input type for the function.
- * - GenerateLearningObjectivesOutput - The output type for the function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 
-export const GenerateLearningObjectivesInputSchema = z.object({
+const GenerateLearningObjectivesInputSchema = z.object({
   topic: z.string().describe('The topic for which to generate learning objectives.'),
   gradeLevel: z.string().describe('The grade level of the students.'),
 });
-export type GenerateLearningObjectivesInput = z.infer<
+type GenerateLearningObjectivesInput = z.infer<
   typeof GenerateLearningObjectivesInputSchema
 >;
 
-export const GenerateLearningObjectivesOutputSchema = z.object({
+const GenerateLearningObjectivesOutputSchema = z.object({
   learningObjectives: z
     .string()
     .describe('A short, bulleted list of learning objectives.'),
