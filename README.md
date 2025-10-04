@@ -16,13 +16,11 @@ Built on a modern stack: Next.js/React for the frontend, ShadCN UI & Tailwind CS
 
 Shiksha AI boosts teacher efficiency by automating tasks, allowing more student focus. It improves educational quality with accessible, relevant content, enables personalized learning, and helps bridge the digital divide for educators in low-connectivity areas.
 
-## Project Stats & Community Contributions
+## Stats
 
-| Metric | Count |
-|--------|--------|
-| **Total Commits** | 143+ |
-| **Contributors** | 1 active |
-| **PRs Merged** | 2+ |
-| **Issues Resolved** | 1+ |
-| **GitHub Stars** | ⭐ 1 |
-| **Hacktoberfest Participation** | ✅ Yes |
+[![Total Commits](https://img.shields.io/badge/Commits-143%2B-blue?style=for-the-badge)](https://github.com/skully-coder/shiksha-ai/commits)
+[![Contributors](https://img.shields.io/badge/Contributors-1-blueviolet?style=for-the-badge)](https://github.com/skully-coder/shiksha-ai/graphs/contributors)
+[![PRs Merged](https://img.shields.io/github/issues-pr-closed/skully-coder/shiksha-ai?style=for-the-badge&color=success)](https://github.com/skully-coder/shiksha-ai/pulls?q=is%3Apr+is%3Amerged)
+[![Issues Resolved](https://img.shields.io/badge/Issues%20Resolved-2-orange?style=for-the-badge)](https://github.com/skully-coder/shiksha-ai/issues?q=is%3Aissue+is%3Aclosed)
+[![GitHub Stars](https://img.shields.io/github/stars/skully-coder/shiksha-ai?style=for-the-badge&color=yellow)](https://github.com/skully-coder/shiksha-ai/stargazers)
+[![Hacktoberfest Participation](https://img.shields.io/badge/Hacktoberfest-2025-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com)
