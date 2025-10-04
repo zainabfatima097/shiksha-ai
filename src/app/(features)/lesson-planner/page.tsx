@@ -15,11 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { generateLessonPlan } from '@/ai/flows/ai-lesson-planner';
+import { generateLearningObjectives } from '@/ai/flows/generate-learning-objectives';
 import { LoadingSpinner } from '@/components/loading-spinner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Download, BookText, Share2, Edit } from 'lucide-react';
+import { Download, BookText, Share2, Edit, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -43,6 +44,7 @@ export default function LessonPlannerPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPdfLoading, setIsPdfLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isGeneratingObjectives, setIsGeneratingObjectives] = useState(false);
   const [lessonPlan, setLessonPlan] = useState('');
   const [editedLessonPlan, setEditedLessonPlan] = useState('');
   const { toast } = useToast();
@@ -73,6 +75,8 @@ export default function LessonPlannerPage() {
     },
   });
 
+  const topicValue = form.watch('topic');
+
   async function onSubmit(values: LessonPlannerFormValues) {
     if (!user || !db) {
       toast({
@@ -100,6 +104,38 @@ export default function LessonPlannerPage() {
       setIsLoading(false);
     }
   }
+
+  const handleGenerateObjectives = async () => {
+    const topic = form.getValues('topic');
+    const gradeLevel = form.getValues('gradeLevel');
+
+    if (!topic || !gradeLevel) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please enter a Topic and Grade Level first.',
+      });
+      return;
+    }
+
+    setIsGeneratingObjectives(true);
+    try {
+      const result = await generateLearningObjectives({ topic, gradeLevel });
+      form.setValue('learningObjectives', result.learningObjectives, {
+        shouldValidate: true,
+      });
+    } catch (error) {
+      console.error('Error generating learning objectives:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to generate learning objectives. Please try again.',
+      });
+    } finally {
+      setIsGeneratingObjectives(false);
+    }
+  };
+
 
   const handleSaveEdit = () => {
     setLessonPlan(editedLessonPlan);
@@ -313,10 +349,23 @@ export default function LessonPlannerPage() {
                           name="learningObjectives"
                           render={({ field }) => (
                           <FormItem>
-                              <FormLabel>Learning Objectives</FormLabel>
+                              <div className="flex items-center justify-between">
+                                <FormLabel>Learning Objectives</FormLabel>
+                                <Button 
+                                  type="button" 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={handleGenerateObjectives}
+                                  disabled={!topicValue || isGeneratingObjectives}
+                                >
+                                  {isGeneratingObjectives ? <LoadingSpinner className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                                  Generate with AI
+                                </Button>
+                              </div>
                               <FormControl>
                               <Textarea placeholder="e.g., Students will be able to describe the stages of the water cycle." {...field} />
                               </FormControl>
+                               {!topicValue && <p className="text-xs text-muted-foreground">Please enter a Topic and Grade Level to generate objectives.</p>}
                               <FormMessage />
                           </FormItem>
                           )}
