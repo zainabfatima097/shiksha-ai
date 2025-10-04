@@ -15,3 +15,14 @@ Built on a modern stack: Next.js/React for the frontend, ShadCN UI & Tailwind CS
 ## Impact of the solution
 
 Shiksha AI boosts teacher efficiency by automating tasks, allowing more student focus. It improves educational quality with accessible, relevant content, enables personalized learning, and helps bridge the digital divide for educators in low-connectivity areas.
+
+## Project Stats & Community Contributions
+
+| Metric | Count |
+|--------|--------|
+| **Total Commits** | 143+ |
+| **Contributors** | 1 active |
+| **PRs Merged** | 2+ |
+| **Issues Resolved** | 1+ |
+| **GitHub Stars** | ⭐ 1 |
+| **Hacktoberfest Participation** | ✅ Yes |
