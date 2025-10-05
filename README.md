@@ -35,13 +35,13 @@ http://localhost:3000/admin
 
 This route is available only in development mode and may be protected or hidden in production builds.
 
-Features Supported
-	•	Add new generated users manually
-	•	Bypass the authentication flow for testing
-	•	Assign user roles (e.g., student, teacher, admin)
-	•	Simulate various access levels
+Features Supported :
+- Add new generated users manually
+- Bypass the authentication flow for testing
+- Assign user roles (e.g., student, teacher, admin)
+- Simulate various access levels
 
-⚠️ Warning
+⚠️ Warning : 
 
 Do not enable or expose the Admin Console in production environments.
 Ensure that the route is disabled, protected, or removed before deploying publicly.
