@@ -106,8 +106,11 @@ export default function AdminPage() {
     const updateLog = (message: string) => setLog(prev => [...prev, message]);
 
     try {
-        updateLog(`Querying for existing students in Grade ${values.grade} Section ${values.section}...`);
-        const studentsQuery = query(collection(db, 'students'), where('class', '==', values.grade), where('section', '==', values.section));
+        const grade = values.grade;
+        const section = values.section.toUpperCase();
+        
+        updateLog(`Querying for existing students in Grade ${grade} Section ${section}...`);
+        const studentsQuery = query(collection(db, 'students'), where('class', '==', grade), where('section', '==', section));
         const querySnapshot = await getDocs(studentsQuery);
 
         let lastRollNumber = 0;
@@ -125,8 +128,8 @@ export default function AdminPage() {
 
         for (let i = 0; i < values.count; i++) {
             const rollNumber = lastRollNumber + i + 1;
-            const email = `student${values.grade}${values.section}_${rollNumber}@example.com`;
-            const password = `student${values.grade}${values.section}_${rollNumber}`;
+            const email = `student${grade}${section}_${rollNumber}@example.com`;
+            const password = `student${grade}${section}_${rollNumber}`;
             const name = `Student ${rollNumber}`;
             
             try {
@@ -139,14 +142,14 @@ export default function AdminPage() {
                 const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
                 const user = userCredential.user;
 
-                const classroomId = `${values.grade}-${values.section}`;
+                const classroomId = `${grade}-${section}`.toUpperCase();
                 const studentData = {
                     uid: user.uid,
                     email,
                     name,
                     role: 'student',
-                    class: values.grade,
-                    section: values.section,
+                    class: grade,
+                    section: section,
                     rollNumber: String(rollNumber),
                     dev_generated: true,
                     classroomId: classroomId,
@@ -158,8 +161,8 @@ export default function AdminPage() {
                 // Add student to classroom
                 const classroomRef = doc(db, 'classrooms', classroomId);
                 await setDoc(classroomRef, {
-                    grade: values.grade,
-                    section: values.section,
+                    grade: grade,
+                    section: section,
                     studentIds: arrayUnion(user.uid)
                 }, { merge: true });
 

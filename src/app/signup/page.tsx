@@ -91,17 +91,19 @@ export default function SignupPage() {
       const collectionName = values.role === 'teacher' ? 'teachers' : 'students';
       
       if (values.role === 'student') {
-          const classroomId = `${values.class}-${values.section}`;
-          userData.class = values.class;
-          userData.section = values.section;
+          const grade = values.class!;
+          const section = values.section!.toUpperCase();
+          const classroomId = `${grade}-${section}`.toUpperCase();
+          userData.class = grade;
+          userData.section = section;
           userData.rollNumber = values.rollNumber;
           userData.classroomId = classroomId;
 
           // Add student to classroom
           const classroomRef = doc(db, 'classrooms', classroomId);
           await setDoc(classroomRef, {
-              grade: values.class,
-              section: values.section,
+              grade: grade,
+              section: section,
               studentIds: arrayUnion(user.uid)
           }, { merge: true });
       }
