@@ -25,6 +25,8 @@ Shiksha AI boosts teacher efficiency by automating tasks, allowing more student 
 [![GitHub Stars](https://img.shields.io/github/stars/skully-coder/shiksha-ai?style=for-the-badge&color=yellow)](https://github.com/skully-coder/shiksha-ai/stargazers)
 [![Hacktoberfest Participation](https://img.shields.io/badge/Hacktoberfest-2025-blueviolet?style=for-the-badge&logo=hacktoberfest)](https://hacktoberfest.com)
 
+## Contributors
+
 <a href="https://github.com/skully-coder/shiksha-ai/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=skully-coder/shiksha-ai" />
 </a>
