@@ -16,6 +16,36 @@ Built on a modern stack: Next.js/React for the frontend, ShadCN UI & Tailwind CS
 
 Shiksha AI boosts teacher efficiency by automating tasks, allowing more student focus. It improves educational quality with accessible, relevant content, enables personalized learning, and helps bridge the digital divide for educators in low-connectivity areas.
 
+## 🧪 Admin Console (Development Mode)
+
+Shiksha AI includes an internal Admin Console to help developers add and manage test users during development — without going through the standard authentication process. This is useful for testing features quickly and reliably.
+
+### How to Use
+
+1. Run the app in development mode:
+
+```
+npm run dev
+```
+
+2. Open your browser and go to:
+```
+http://localhost:3000/admin
+```
+
+This route is available only in development mode and may be protected or hidden in production builds.
+
+Features Supported
+	•	Add new generated users manually
+	•	Bypass the authentication flow for testing
+	•	Assign user roles (e.g., student, teacher, admin)
+	•	Simulate various access levels
+
+⚠️ Warning
+
+Do not enable or expose the Admin Console in production environments.
+Ensure that the route is disabled, protected, or removed before deploying publicly.
+
 ## Stats
 
 [![Total Commits](https://img.shields.io/badge/Commits-143%2B-blue?style=for-the-badge)](https://github.com/skully-coder/shiksha-ai/commits)
