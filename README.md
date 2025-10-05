@@ -29,4 +29,3 @@ Shiksha AI boosts teacher efficiency by automating tasks, allowing more student 
   <img src="https://contrib.rocks/image?repo=skully-coder/shiksha-ai" />
 </a>
 
-Made with [contrib.rocks](https://contrib.rocks).
