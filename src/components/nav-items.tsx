@@ -1,13 +1,13 @@
-
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User, Users } from "lucide-react";
+import { BookText, Sheet, ImageIcon, BrainCircuit, Languages, LogOut, User, Users, Palette } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const teacherNavItems = [
   { href: "/lesson-planner", icon: BookText, label: "Lesson Planner" },
@@ -71,21 +71,35 @@ export function NavItems() {
         ))}
       </SidebarMenu>
       <SidebarMenu>
-         <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Profile" isActive={pathname === '/profile'}>
-              <Link href="/profile">
-                <User />
-                <span className="truncate">{user?.email ?? "Profile"}</span>
-              </Link>
-            </SidebarMenuButton>
-        </SidebarMenuItem>
+        {/* Theme Toggle */}
         <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
-              <LogOut />
-              <span>Logout</span>
-            </SidebarMenuButton>
+          <SidebarMenuButton tooltip="Theme">
+            <div className="flex items-center w-full">
+              <Palette className="h-4 w-4" />
+              <span className="flex-1 ml-2">Theme</span>
+              <ThemeToggle />
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+
+        {/* Profile */}
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild tooltip="Profile" isActive={pathname === '/profile'}>
+            <Link href="/profile">
+              <User />
+              <span className="truncate">{user?.email ?? "Profile"}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+
+        {/* Logout */}
+        <SidebarMenuItem>
+          <SidebarMenuButton onClick={handleLogout} tooltip="Logout">
+            <LogOut />
+            <span>Logout</span>
+          </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
     </div>
   );
-}
+   }
